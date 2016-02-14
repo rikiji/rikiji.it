@@ -1,0 +1,146 @@
+<!doctype html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Rwiimote gem available</title>
+    <meta name="author" content="@rikiji">
+    <meta name="description" content="a blog">
+    <meta name="viewport" content="width=device-width">
+    <link href="atom.xml" type="application/atom+xml" rel="alternate">
+
+    <meta name="viewport" content="width=device-width">
+    <link rel="stylesheet" href="/styles/main.css">
+    <script src="/scripts/vendor/modernizr.js"></script>
+    <script src="/scripts/vendor/jquery-1.9.1.min.js"></script>
+    
+    <script type="text/javascript">
+      var addthis_config = {"data_track_clickback":false };
+      var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
+    </script>
+    
+    <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
+    <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
+    <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
+    <link href="http://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300" rel="stylesheet" type="text/css">
+  </head>
+  <body>
+
+    <!--[if lt IE 7]>
+        <p class="chromeframe">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">activate Google Chrome Frame</a> to improve your experience.</p>
+    <![endif]-->
+
+    <div class="row-fluid">
+      <div id="content" class="span9">
+	<div class="top">
+  <h2><a href="http://rikiji.it/2010/05/09/Rwiimote-gem-available.html">Rwiimote gem available</a></h2>
+  <h3>May 09 2010</h3>
+</div>
+<div class="post">
+  
+  <p>I just pushed to <a href='http://rubygems.org]'>rubygems</a> my first gem!! It&#8217;s called <a href='http://rubygems.org/gems/rwiimote'>rwiimote</a>, it&#8217;s a wrapper around <strong>libcwiimote3</strong>, which provides some bindings to control wiimotes over bluetooth. To install:</p>
+
+<pre><code>gem install rwiimote</code></pre>
+
+<p>Included within the gem there&#8217;s a <code>README</code> that provides some documentation, along with some usage examples. Let&#8217;s analyze them here:</p>
+
+<pre><code>w=Wiimote.new
+
+# w.connect requires mac address of device to connect to. find it by running &quot;hcitool scan&quot; just after you hit 1&amp;2 on your wiimote
+
+puts &quot;press both 1 and 2 keys to connect&quot;
+exit unless w.connect &quot;00:11:22:33:44:55&quot;
+puts &quot;connected!&quot;
+
+# you can turn those fancy blue leds on or off by calling on/off methods on them 
+w.led[1].on
+w.led[2].off
+
+puts &quot;click home to disconnect&quot;
+while w.open?
+  # w.update has to be called every time you want to send/receive new data to/from the device. usually it&#39;s at the beginning of a loop like this 
+  w.disconnect unless w.update
+  
+  # check if button &quot;a&quot; was pressed
+  puts &quot;a!&quot; if w.a?
+
+  # disconnect if button &quot;home&quot; was pressed
+  w.disconnect if w.home?
+end</code></pre>
+
+<p>The second one shows how to access the force data:</p>
+
+<pre><code>w=Wiimote.new
+exit unless w.connect &quot;00:11:22:33:44:55&quot;
+
+# turn on accelerometer
+w.acc= true
+
+puts &quot;shake to disconnect!!&quot;
+while w.open?
+  w.disconnect unless w.update
+
+  #	print information about each axis of the accelerometer
+  puts &quot;force x: &quot; + w.force_x.to_s
+  puts &quot;force y: &quot; + w.force_y.to_s
+  puts &quot;force z: &quot; + w.force_z.to_s
+
+  # disconnect if you were shaking too hard :)
+  w.disconnect if w.force &gt; 2
+end</code></pre>
+
+<p>There are some other methods available, check them in the <code>README</code> file. Drop me a line if something does not work or if you just have some questions about it.</p>
+  
+  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2010/05/09/Rwiimote-gem-available.html" addthis:title="Rwiimote gem available" addthis:description="I just pushed to [rubygems](http://rubygems.org]) my first gem!! It's called [rwiimote](http://rubygems.org/gems/rwiimote), it's a wrapper around __libcwiimote3__, which provides some bindings...">
+    <a class="addthis_button_reddit"></a>    
+    <a class="addthis_button_facebook"></a>
+    <a class="addthis_button_twitter"></a>
+    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
+    <a class="addthis_counter addthis_bubble_style"></a>
+  </div>
+
+</div>
+<hr>
+
+	<div class="bottom">	  
+	  <div>
+	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
+	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
+	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
+	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+	  </div>
+	  <p class="eof">EOF</p>
+	</div>
+
+
+      </div>
+      <div id="sidebar" class="span3">
+	<div class="sidebar-nav sidebar-nav-fixed">
+	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <hr>
+	  <ul class="unstyled">
+	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
+	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
+	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
+	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
+	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	  </ul>
+	</div>
+      </div>
+    </div>
+
+    <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
+    <script>
+      var _gaq=[['_setAccount','UA-30381469-1'],['_trackPageview']];
+      (function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+      g.src=('https:'==location.protocol?'//ssl':'//www')+'.google-analytics.com/ga.js';
+      s.parentNode.insertBefore(g,s)}(document,'script'));
+    </script>
+
+    <script src="/scripts/main.js"></script>
+  </body>
+</html>

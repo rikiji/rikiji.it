@@ -1,0 +1,849 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+ 
+ <title>rikiji.it</title>
+ <link href="http://rikiji.it/atom.xml" rel="self"/>
+ <link href="http://rikiji.it/"/>
+ <updated>2015-03-06T00:01:03+01:00</updated>
+ <id>http://rikiji.it/</id>
+
+ 
+ <entry>
+   <title>CVE-2013-2094 port to x86</title>
+   <link href="http://rikiji.it/2013/05/10/CVE-2013-2094-x86.html"/>
+   <updated>2013-05-10T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2013/05/10/CVE-2013-2094-x86</id>
+   <content type="html">&lt;p&gt;TL;DR: (&lt;a href='https://gist.github.com/anonymous/40996630379660447f85'&gt;perf_ptmx.c&lt;/a&gt;)&lt;/p&gt;
+
+&lt;p&gt;Last week on &lt;a href='https://news.ycombinator.com/item?id=5703758'&gt;HN&lt;/a&gt; a link to a linux local privilege escalation exploit was posted, exploit which affects all linux versions between 2.6.37 and 3.8.9 compiled with PERF_EVENTS enabled. Some distros backported the bug to older kernel versions too, I tested CentOS 2.6.32-358.el6.x86_64 as vulnerable. The security issue is located in &lt;a href='http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/kernel/events/core.c?id=8176cced706b5e5d15887584150764894e94e02f'&gt;kernel/events/core.c&lt;/a&gt;, and it has been introduced in a &lt;a href='http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b0a873ebbf87bf38bf70b5e39a7cadc96099fa13'&gt;commit&lt;/a&gt; which added the functions &lt;code&gt;perf_swevent_init&lt;/code&gt; and &lt;code&gt;sw_perf_event_destroy&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The problem lies in the fact that the value &lt;code&gt;event-&amp;gt;attr.config&lt;/code&gt;, which is stored in the struct &lt;code&gt;perf_event_attr&lt;/code&gt; as u64, is being checked for validity after being casted to a signed int. The check is done with:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;if (event_id &amp;gt; PERF_COUNT_SW_MAX)
+  return -ENOENT;&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This means that any value of &lt;code&gt;event-&amp;gt;attr.config&lt;/code&gt; which has in the lower 4 bytes a negative value will pass the check and will later be used as index for the array &lt;code&gt;perf_swevent_enabled&lt;/code&gt;. Known the address of the base of the array, it is possible (with some limitations) to increment/decrement arbitrary memory locations in kernel space. The vulnerability was &lt;a href='http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8176cced706b5e5d15887584150764894e94e02f'&gt;fixed&lt;/a&gt; just changing the &lt;code&gt;event_id&lt;/code&gt; type to u64.&lt;/p&gt;
+
+&lt;p&gt;Full credit to sd@fucksheep.org for releasing the exploit (linked above). The original exploit targets specifically the x86_64 architecture, and I&amp;#8217;ve now ported it to x86 Debian. The original version worked by incrementing the highest 4 bytes &lt;code&gt;base_hi&lt;/code&gt; in the x86_64 IDT entry of interrupt 4, from 0xffffffff to 0x00000000, and then mapping the corresponding memory region in userspace, filling it with some shellcode to raise the privileges of the running process.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;struct _idt_entry_64 {
+  unsigned short base_lo;
+  unsigned short sel;
+  unsigned char unused;
+  unsigned char flags;
+  unsigned short base_mi;
+  unsigned int base_hi;
+  unsigned int zero;
+} __attribute__((packed));
+
+struct _idt_entry {
+  unsigned short base_lo;
+  unsigned short sel;
+  unsigned char unused;
+  unsigned char flags;
+  unsigned short base_hi;
+} __attribute__((packed));&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Since on x86 the IDT struct is different from the x86_64 one this approach can&amp;#8217;t be used. On Debian &lt;code&gt;perf_swevent_enabled&lt;/code&gt; is a pointer to a struct of 4 bytes, so targeting IDT makes no sense because even if we can increment any memory location multiple times (check the next paragraph to see how), &lt;code&gt;base_hi&lt;/code&gt; (of any interrupt) could be incremented only pointing to flags (because the granularity of the pointer we can manipulate is 4 bytes and the IDT is aligned in memory), therefore requiring more than 64k increments to increase &lt;code&gt;base_hi&lt;/code&gt; only by 1.&lt;/p&gt;
+
+&lt;p&gt;An idea from &lt;a href='http://www.reddit.com/user/spender'&gt;/u/spender&lt;/a&gt; is to call multiple times &lt;code&gt;perf_event_open&lt;/code&gt; while keeping the file descriptors open, avoiding the destroy callback which will revert the change done in the init function. In this way is is possible to increment a value in kernel space multiple times. This has the drawback of the process hitting the maximum number of open file descriptors allowed very fast, so some forking is required. I browsed a bit the kernel source to find a function pointer initialized to zero which was not stored in read only memory, and I chose to leverage &lt;code&gt;drivers/tty/pty.c&lt;/code&gt;, a driver for ptmx devices, which is enabled in the default Debian kernel and has &lt;code&gt;struct file_operations ptmx_fops&lt;/code&gt;, which has some NULL pointers and more importantly is not in read only memory.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;/* 56 is offset of fsync in struct file_operations */
+int target = pmtx_ops + 56;
+int payload = -((perf_table - target)/4)
+
+struct perf_event_attr event_attr;
+event_attr.config = payload;
+...
+/* many many times */
+syscall(__NR_perf_event_open, &amp;amp;event_attr, 0, -1, -1, 0);
+...
+int ptmx = open(&amp;quot;/dev/ptmx&amp;quot;, O_RDWR);
+fsync(ptmx);&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The exploit resolves a few symbols names using System.map, maps some memory at 0x10000 right after &lt;code&gt;vm.mmap_min_addr&lt;/code&gt; and fills it with privilege escalation code, then computes the offset of the &lt;code&gt;fsync&lt;/code&gt; pointer for the pseudo terminal device in relation to &lt;code&gt;perf_swevent_enabled&lt;/code&gt;. The syscall &lt;code&gt;perf_event_open&lt;/code&gt; is called exactly 0x10000 times spread among multiple processes. The shellcode is then executed opening &lt;code&gt;/dev/ptmx&lt;/code&gt; and calling &lt;code&gt;fsync&lt;/code&gt; on it. When the processes terminate/close the fd returned by the syscall, clean up will be done automatically by &lt;code&gt;sw_perf_event_destroy&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href='http://zmbs.net/~rikiji/perf_ptmx.c'&gt;source code&lt;/a&gt;, &lt;code&gt;gcc perf_ptmx.c &amp;amp;&amp;amp; ./a.out&lt;/code&gt;.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>On ruby's garbage collector</title>
+   <link href="http://rikiji.it/2013/03/01/on-rubys-garbage-collector.html"/>
+   <updated>2013-03-01T00:00:00+01:00</updated>
+   <id>http://rikiji.it/2013/03/01/on-rubys-garbage-collector</id>
+   <content type="html">&lt;p&gt;Ruby 2.0 features a new garbage collection algorithm, called Bitmap Marking. To understand how this new approach works, a brief look at the ruby design is needed, starting with &lt;strong&gt;ruby.h&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;All ruby objects are referenced through variables of the type &lt;code&gt;VALUE&lt;/code&gt; in the C code: a &lt;code&gt;VALUE&lt;/code&gt; is an unsigned integer that can be an immediate value (integer, float, symbol, true, false , nil) or a pointer to a &lt;code&gt;RBasic&lt;/code&gt; structure. A &lt;code&gt;RBasic&lt;/code&gt; structure holds two fields, &lt;code&gt;flags&lt;/code&gt; and &lt;code&gt;klass&lt;/code&gt;. There are many macros that can be used to check the type of an object just by accessing those flags, &lt;code&gt;BUILTIN_TYPE&lt;/code&gt; is one of those and it is defined as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;#define BUILTIN_TYPE(x) (int)(((struct RBasic*)(x))-&amp;gt;flags &amp;amp; T_MASK)&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The type of an object can be one of those in the enum &lt;code&gt;ruby_value_type&lt;/code&gt;, some of them are:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;enum ruby_value_type {
+RUBY_T_NONE   = 0x00,
+
+RUBY_T_OBJECT = 0x01,
+RUBY_T_CLASS  = 0x02,
+RUBY_T_MODULE = 0x03,
+RUBY_T_FLOAT  = 0x04,
+RUBY_T_STRING = 0x05,
+RUBY_T_REGEXP = 0x06,
+RUBY_T_ARRAY  = 0x07,
+RUBY_T_HASH   = 0x08,
+RUBY_T_STRUCT = 0x09,
+RUBY_T_BIGNUM = 0x0a,
+RUBY_T_FILE   = 0x0b,
+RUBY_T_DATA   = 0x0c,
+RUBY_T_MATCH  = 0x0d,
+RUBY_T_COMPLEX  = 0x0e,
+RUBY_T_RATIONAL = 0x0f,
+...&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So how does it work in practice? Let&amp;#8217;s have a look at &lt;code&gt;RString&lt;/code&gt;: it is a struct that holds a &lt;code&gt;RBasic&lt;/code&gt; struct inside. When you want to check if a &lt;code&gt;VALUE&lt;/code&gt; is a string, the first thing that &lt;code&gt;rb_type(VALUE obj)&lt;/code&gt; does is to check if it is an immediate value. If not, it will be cast to &lt;code&gt;RBasic&lt;/code&gt; and the flags will be accessed by &lt;code&gt;BUILTIN_TYPE&lt;/code&gt;. The result can be compared to &lt;code&gt;RUBY_T_STRING&lt;/code&gt;: if it matches, it is safe to cast (again) the &lt;code&gt;VALUE&lt;/code&gt; to &lt;code&gt;RString&lt;/code&gt;. Please note that the &lt;code&gt;RBasic&lt;/code&gt; structure is still accessible with the new pointer, as it is included into &lt;code&gt;RString&lt;/code&gt;!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;struct RString {
+struct RBasic basic;
+union {
+    struct {
+	long len;
+	char *ptr;
+	union {
+	    long capa;
+	    VALUE shared;
+	} aux;
+    } heap;
+    char ary[RSTRING_EMBED_LEN_MAX + 1];
+} as;
+};&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;RString has actually more features than RBasic, it can contain an array of characters directly (on a 32 bits system the max size is 12 + 1 bytes) or it can contain a reference to a string allocated elsewhere. Casting &lt;code&gt;RBasic&lt;/code&gt; structures to other types is valid for all ruby objects, and this feature is exploited by the GC to allocate space easily.&lt;/p&gt;
+
+&lt;p&gt;Now that the basic strategies of &lt;code&gt;VALUE&lt;/code&gt; handling used by the ruby interpreter are known, we can move on to &lt;strong&gt;gc.c&lt;/strong&gt;. &lt;code&gt;RVALUE&lt;/code&gt; is a wrapper structure used to hold any of the previously discussed ones. This is the base &amp;#8220;unit&amp;#8221; that will be used to allocate and free memory.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt; typedef struct RVALUE {
+union {
+    struct {
+	VALUE flags;		/* always 0 for freed obj */
+	struct RVALUE *next;
+    } free;
+    struct RBasic  basic;
+    struct RObject object;
+    struct RClass  klass;
+    struct RFloat  flonum;
+    struct RString string;
+    struct RArray  array;
+    struct RRegexp regexp;
+    struct RHash   hash;
+    struct RData   data;
+    struct RTypedData   typeddata;
+    struct RStruct rstruct;
+    struct RBignum bignum;
+    struct RFile   file;
+    struct RNode   node;
+    struct RMatch  match;
+    struct RRational rational;
+    struct RComplex complex;
+} as;
+} RVALUE;&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Ruby tracks allocated memory in structures called &lt;code&gt;heaps_slot&lt;/code&gt;. Each of them includes a pointer to a linked list of &lt;code&gt;RVALUE&lt;/code&gt; structures. Let&amp;#8217;s follow the flow of the code when a new object is created, I cut out not relevant lines:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;static VALUE
+newobj(VALUE klass, VALUE flags)
+{
+rb_objspace_t *objspace = &amp;amp;rb_objspace;
+VALUE obj;
+
+...
+
+obj = (VALUE)objspace-&amp;gt;heap.free_slots-&amp;gt;freelist;
+objspace-&amp;gt;heap.free_slots-&amp;gt;freelist = RANY(obj)-&amp;gt;as.free.next;
+if (objspace-&amp;gt;heap.free_slots-&amp;gt;freelist == NULL) {
+    unlink_free_heap_slot(objspace, objspace-&amp;gt;heap.free_slots);
+}
+
+MEMZERO((void*)obj, RVALUE, 1);
+objspace-&amp;gt;total_allocated_object_num++;
+
+return obj;
+}&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;A &lt;code&gt;RVALUE&lt;/code&gt; object is taken from a global freelist and the head of the list is shifted forwards. This &lt;code&gt;obj&lt;/code&gt; is a pointer to a memory area which is big enough to store any ruby structure: &lt;code&gt;RString&lt;/code&gt;, &lt;code&gt;RArray&lt;/code&gt;&amp;#8230; When this list becomes empty, the GC is called and it will try to free some &lt;code&gt;RVALUE&lt;/code&gt;. If not possible, a new &lt;code&gt;heaps_slot&lt;/code&gt; (or more) will be allocated.&lt;/p&gt;
+
+&lt;p&gt;Now that is known how objects are allocated, we can inspect the two phases of the garbage collector. The phases are named &lt;strong&gt;mark&lt;/strong&gt; and &lt;strong&gt;sweep&lt;/strong&gt;. In the first phase all the objects still reachable are marked. In the sweep phase all the objects not marked are identified and added to the freelist we mentioned before. Additionally, while traversing the lists all marks are reset to prepare the objects for the next GC round.&lt;/p&gt;
+
+&lt;p&gt;Starting from the function &lt;code&gt;garbage_collect&lt;/code&gt;, we can dig into the mark phase, handled by the function &lt;code&gt;gc_marks&lt;/code&gt;. The real job is done by the function &lt;code&gt;gc_mark_stacked_objects&lt;/code&gt;, which consists in a giant switch-case statement that handles all the &lt;code&gt;RVALUE&lt;/code&gt; subtypes differently. In the sweep phase, which starts in &lt;code&gt;gc_sweep&lt;/code&gt;, all the &lt;code&gt;RVALUE&lt;/code&gt; objects without a mark are added to the freelist that is used to allocate new objects.&lt;/p&gt;
+
+&lt;p&gt;In the next post I&amp;#8217;ll focus on the improvements introduced by the garbage collector of Ruby 2.0 and maybe provide some benchmark result.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Redis Android NDK port</title>
+   <link href="http://rikiji.it/2012/08/21/Redis-Android-NDK-port.html"/>
+   <updated>2012-08-21T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2012/08/21/Redis-Android-NDK-port</id>
+   <content type="html">&lt;p&gt;I just finished the first step of porting &lt;a href='http://redis.io'&gt;Redis&lt;/a&gt;, the server component, to the Android ndk. I didn&amp;#8217;t test anything besides basic features, value store/load, db save and db restore but the few things i tested worked perfectly. To port it i created a stub app and compiled the source tree as a &lt;strong&gt;JNI&lt;/strong&gt; library. I brought in &lt;strong&gt;lua&lt;/strong&gt; too since it is a dependency needed by Redis for server-side scripting.&lt;/p&gt;
+
+&lt;p&gt;I added in the source code &lt;code&gt;#ifdef __ANDROID__&lt;/code&gt; macros where I introduced some fixes to compile successfully, mostly related to compatibility with the bionic c library on Android. The entry point in &lt;code&gt;redis.c&lt;/code&gt; has been substituted by a &lt;strong&gt;JNI&lt;/strong&gt; call and the log function hooked to &lt;strong&gt;Logcat&lt;/strong&gt; for convenient debugging. The db is stored on the sdcard in &lt;code&gt;/sdcard/redis/&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The stub app has a button to start/stop Redis as an Android service and another one to test if it answers correctly to set/get calls. It is up &lt;a href='https://github.com/rikiji/redis-android'&gt;here on github&lt;/a&gt;. I use &lt;a href='https://github.com/xetorthio/jedis'&gt;Jedis&lt;/a&gt; as a client library, the next step will be importing the Jedis test suite to fix what doesn&amp;#8217;t behave in the right way and add an option to read the server configuration file from the sdcard.&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href='https://github.com/rikiji/redis-android'&gt;Fork it on github&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>rediswrap</title>
+   <link href="http://rikiji.it/2012/06/26/rediswrap.html"/>
+   <updated>2012-06-26T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2012/06/26/rediswrap</id>
+   <content type="html">&lt;p&gt;I&amp;#8217;ll dump here some info about a &lt;a href='https://github.com/rikiji/rediswrap/'&gt;library&lt;/a&gt; i started writing some time ago or i&amp;#8217;ll end up forgetting it. This is a straightforward c++ wrapper of libhiredis, I know that there are already dozens of c++ Redis libraries out there but i needed something natively compatible with the standard c++ vectors and strings, therefore this library.&lt;/p&gt;
+
+&lt;p&gt;I already implemented Redis operations for &lt;code&gt;strings&lt;/code&gt;, &lt;code&gt;keys&lt;/code&gt;, &lt;code&gt;lists&lt;/code&gt; and &lt;code&gt;sets&lt;/code&gt;, so it&amp;#8217;s already quite usable. &lt;code&gt;hashes&lt;/code&gt; and server management calls are not there yet. The usage is designed to be as simple as possible, the following is a snippet taken from the regression tests:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;rediswrap::Redis r;
+r.set(&amp;quot;foo&amp;quot;,&amp;quot;100&amp;quot;);
+assert(r.decr(&amp;quot;foo&amp;quot;) == 99);
+assert(r.decrby(&amp;quot;foo&amp;quot;,6) == 93);
+
+vector&amp;lt;string&amp;gt; vals;
+vals.push_back(&amp;quot;aaa&amp;quot;);
+vals.push_back(&amp;quot;bbb&amp;quot;);
+assert(r.lpushm(&amp;quot;foo&amp;quot;,vals) == 3);&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The source code is up on &lt;a href='https://github.com/rikiji/rediswrap/'&gt;github&lt;/a&gt;.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>RMotion with additional neural networks</title>
+   <link href="http://rikiji.it/2012/06/26/RMotion-with-additional-neural-networks.html"/>
+   <updated>2012-06-26T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2012/06/26/RMotion-with-additional-neural-networks</id>
+   <content type="html">&lt;p&gt;Last year I developed RMotion, a library with &lt;strong&gt;ruby&lt;/strong&gt; bindings that can be used to detect moving objects in a video/cam stream in real time. It is quite convenient to solve simple detections problems because you can just program the logic in &lt;strong&gt;ruby&lt;/strong&gt; inside the main loop and you get most of the detection issues solved for free by the library.&lt;/p&gt;
+
+&lt;p&gt;I subsequentely added classifying features: as you can see in the &lt;a href='http://www.youtube.com/watch?v=1wxg4nUQ_DA&amp;amp;feature=g-upl'&gt;previous video&lt;/a&gt; or in this one below, it is now possible to train a classifier with a desired shape and then receive in &lt;strong&gt;ruby&lt;/strong&gt; the type of the moving entity, according to an accuracy threshold specified.&lt;/p&gt;
+
+&lt;p&gt;The improvement from my last post is the classification of multiple classes of objects instead of a single one, and the removal of the edge effect that occurred when the object was not fully in view. The video is slowed down at approx. 30% to make the labels visible for humans!&lt;/p&gt;
+&lt;div class='youtube'&gt;&lt;center&gt;&lt;iframe frameborder='0' height='300' src='http://www.youtube.com/embed/IsNLzhu_BKM' width='80%'&gt;        &lt;/iframe&gt;&lt;/center&gt;&lt;/div&gt;
+&lt;p&gt;Unfortunately the manual work for the user increases linearly with the number of classes to detect. Currently i&amp;#8217;m using multiple neural networks ( &lt;strong&gt;supervised learning&lt;/strong&gt; ) as a classifier, and human intervention is necessary to decide which shapes belong to a class and which are noise before training the net. After that the shapes are generated, the user places them in appropriately labeled directories and then a training script does everything automatically:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;rkj@harpoon:~/code/rmotion/v3$ ruby net/car.net sets/car/
+Training
+count: 00000, terror: 1.26979
+count: 00010, terror: 0.02167
+count: 00020, terror: 0.00835
+...
+count: 02530, terror: 0.00004
+count: 02540, terror: 0.00004
+Testing
+EXPECTED: true
+0.941322135603077 true
+EXPECTED: false
+0.02227733085452 false
+rkj@harpoon:~/code/rmotion/v3$ ruby net/bike.net sets/bike/
+Training
+count: 00000, terror: 1.46554
+count: 00010, terror: 0.01378
+...&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The idea to mitigate this effort is to use &lt;strong&gt;unsupervised learning&lt;/strong&gt; to classify the different classes, so that if the classifier learns how a high number of objects are shaped it will be eventually able to partition them in groups, and the job of the user will be just to decide within how many groups the objects are going to be split. I didn&amp;#8217;t decide yet the nature of the unsupervised classifier, I&amp;#8217;ll run some tests as soon as i can get some good quality traffic footage.&lt;/p&gt;
+
+&lt;p&gt;The second thing that i&amp;#8217;d like to add is a stronger object tracking algorithm, so that if the object stops or its path overlaps with another one it would be possible to track it anyway. I can implement this using some kind of &lt;strong&gt;feature detection&lt;/strong&gt; other than movement or i can record the position and the full path on screen of the object and trace back the origin of disappearing/reappearing objects. The first approach sound more appealing to me, so the next step will be in that direction.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Tor consensus nse parser</title>
+   <link href="http://rikiji.it/2012/04/10/Tor-consensus-nse-parser.html"/>
+   <updated>2012-04-10T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2012/04/10/Tor-consensus-nse-parser</id>
+   <content type="html">&lt;p&gt;Today I quickly translated a python script i had floating around into a more useful &lt;a href='http://nmap.org/nsedoc/'&gt;NSE script&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;It pulls the consensus data from one of the 9 Tor directory servers (&lt;a href='https://gitweb.torproject.org/tor.git/tree/HEAD:/doc'&gt;documentation here&lt;/a&gt;) and runs a regular expression to extract the ip addresses of the nodes until it finds a matching one.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;nmap -p0 -dd -Pn --datadir=. --script=tor-consensus-checker 86.59.11.2
+...
+NSE: Starting &amp;#39;tor-consensus-checker&amp;#39; (thread: 0x9a87568) against 86.59.11.2.
+Initiating NSE at 23:36
+NSE: checking if 86.59.11.2 is a tor relay
+NSE: Final http cache size (674972 bytes) of max size of 1000000
+NSE: consensus retrieved from 128.31.0.39
+NSE: Finished &amp;#39;tor-consensus-checker&amp;#39; (thread: 0x9a87568) against 86.59.11.2.
+PORT  STATE  SERVICE REASON
+0/tcp closed unknown conn-refused
+
+Host script results:
+| tor-consensus-checker: 
+|_  86.59.11.2 is a tor node
+
+Nmap done: 1 IP address (1 host up) scanned in 1.42 seconds&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The script can currently be found on my &lt;a href='https://github.com/rikiji/nmap-scripts'&gt;github repository&lt;/a&gt; of nmap scripts.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>EAP authentication scan</title>
+   <link href="http://rikiji.it/2012/03/01/EAP-authentication-scan.html"/>
+   <updated>2012-03-01T00:00:00+01:00</updated>
+   <id>http://rikiji.it/2012/03/01/EAP-authentication-scan</id>
+   <content type="html">&lt;p&gt;I&amp;#8217;ve been working on a &lt;a href='http://nmap.org/nsedoc/'&gt;NSE script&lt;/a&gt; which enumerates the authentication methods available on an eap authenticator, especially useful when those methods that support 2-step authentication with an anonymous identity in the first step are offered.&lt;/p&gt;
+
+&lt;p&gt;The principle is straightforward, for a group of auth methods of interest the script will follow the eap handshake sequence multiple times keeping track of the methods offered:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;sending eap start packet to the broadcast mac address &lt;code&gt;01:80:c2:00:00:03&lt;/code&gt;&lt;/li&gt;
+
+&lt;li&gt;responding to the identity request issued by the ap&lt;/li&gt;
+
+&lt;li&gt;parsing the auth request to find the auth method offered, then responding with a nak packet that requests another method&lt;/li&gt;
+
+&lt;li&gt;If auth request: &lt;code&gt;5&lt;/code&gt;, if instead failure packet is received: &lt;code&gt;6&lt;/code&gt;&lt;/li&gt;
+
+&lt;li&gt;respond with another nak and another auth method, then again &lt;code&gt;4&lt;/code&gt;&lt;/li&gt;
+
+&lt;li&gt;auth method not available. restart from state &lt;code&gt;1&lt;/code&gt; unless already tested every protocol of interest.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;A simple session is given below (relying on my memory, hope to remember everything correctly):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Eap start
+-- -- -- --
+01 01 00 00
+
+Eap identity request
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+01 00 00 0A 01 EF 00 0A 01 68 65 6C 6C 6F
+
+Eap identity response
+-- -- -- -- -- -- -- -- -- -- -- -- --  
+01 00 00 09 02 EF 00 09 01 75 75 65 72 
+
+EAP PEAP authentication request
+-- -- -- -- -- -- -- -- --  
+01 00 LL LL 01 CD LL LL 19  ... more stuff (LL = length)
+
+EAP NAK response, TTLS requested
+-- -- -- -- -- -- -- -- -- --
+01 00 00 05 02 CD 00 05 03 15&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The script currently enumerates successfully the auth methods when tested with hostapd v0.6.10, it&amp;#8217;s on my &lt;a href='https://github.com/rikiji/nmap-scripts'&gt;github&lt;/a&gt; as well as in the nmap main trunk.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;nmap -e eth2 -sn --script=eap-info --datadir=. localhost
+Pre-scan script results:
+| eap-info:
+| Available authentication methods with identity=&amp;quot;anonymous&amp;quot;:
+|   true     PEAP
+|   true     EAP-TTLS
+|   false    EAP-TLS
+|_  false    EAP-MSCHAP-V2&lt;/code&gt;&lt;/pre&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Japanese learning tool with HTML5 interface</title>
+   <link href="http://rikiji.it/2011/06/20/Japanese-learning-tool-with-HTML5-interface.html"/>
+   <updated>2011-06-20T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2011/06/20/Japanese-learning-tool-with-HTML5-interface</id>
+   <content type="html">&lt;p&gt;I always find useful those language learning tools that are aimed to train a single specific skill among those needed to master a foreign language (one tool one task). I was looking for something that could help me to build some knowledge about daily sentences, both in meaning and in pronunciation, showing kanjis while providing also them as kana. Like i did with &lt;strong&gt;playkanji.com&lt;/strong&gt; i decided to build an user interface in JavaScript to fulfill the need: &lt;a href='http://teacher.playkanji.com'&gt;teacher.playkanji.com&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Japanese suits very well to software development since it isn&amp;#8217;t really necessary to have your program translate a sentence (very hard) to help the user with additional info. &lt;a href='http://chasen.naist.jp/hiki/ChaSen/'&gt;Chasen&lt;/a&gt; provides some help in parsing sentence structure while &lt;a href='http://ftp.monash.edu.au/pub/nihongo/00INDEX.html'&gt;Edict&lt;/a&gt; is the most famous digital japanese dictionary.&lt;/p&gt;
+
+&lt;p&gt;My web application is really &lt;strong&gt;HTML5&lt;/strong&gt; dependent, it makes use of some &lt;strong&gt;local storage&lt;/strong&gt; functions as well as &lt;strong&gt;audio&lt;/strong&gt; tags. You are supposed to read and listen the sentence clicking on the &lt;code&gt;play ♪&lt;/code&gt; button, the if necessary some info (meaning and pronunciation) of displayed kanjis is provided clicking on &lt;code&gt;kanji help&lt;/code&gt; (&lt;code&gt;help 漢字&lt;/code&gt;). While typing your translation in the grey box it will be parsed and evaluated in real time. It will be compared to the reference translation, and matching word will be highlighted in blue. For those interested in the internals of it I&amp;#8217;m using the &lt;a href='http://en.wikipedia.org/wiki/Levenshtein_distance]'&gt;Levenshtein distance&lt;/a&gt; to highlight your words in a blue shade getting darker while they are getting closer to the correct word. One limitation of my batch of data is that dictionary references that you will find clicking on &lt;code&gt;help&lt;/code&gt; won&amp;#8217;t exatcly match the reference translation, since it would require large amount of manual work to fix. Consider them as a hint and help yourself with some synonyms while messing with Levenshtein output.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;HTML5&lt;/strong&gt; local storage capabilities let me save the study history within your browser, so there&amp;#8217;s no need for login, password and so on: just fire up &lt;a href='http://teacher.playkanji.com'&gt;teacher.playkanji.com&lt;/a&gt; and enjoy. Clicking &lt;code&gt;clear this result&lt;/code&gt; and &lt;code&gt;clear all history&lt;/code&gt; in the right upper side of the page will lead you to reset the current result and the whole history respectively.&lt;/p&gt;
+
+&lt;p&gt;Drop me a line if you spot a bug or a bad translation, the app has not been tested thoroughly and i&amp;#8217;m still drilling through sentences. Currently supports only &lt;strong&gt;Firefox&lt;/strong&gt; and &lt;strong&gt;Chrome&lt;/strong&gt;, don&amp;#8217;t even bother trying on IE. Opera and safari untested.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Linux kernel programming exercises 1</title>
+   <link href="http://rikiji.it/2011/04/17/Linux-kernel-programming-exercises-1.html"/>
+   <updated>2011-04-17T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2011/04/17/Linux-kernel-programming-exercises-1</id>
+   <content type="html">&lt;p&gt;This is the first post of a series (i hope) about linux kernel development. Despite there are &lt;a href='http://www.amazon.com/Linux-Kernel-Development-Robert-Love/dp/0672329468' title='Linux Kernel Development'&gt;excellent&lt;/a&gt; &lt;a href='http://lwn.net/Kernel/LDD3/' title='Linux Device Drivers'&gt;books&lt;/a&gt; that describe throughly both kernel and modules, there aren&amp;#8217;t many sources that provide programming exercises in the form &lt;strong&gt;task-hint-solution&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;Purpose of this series of posts is to compensate for that lack. Source of exercises will be available on &lt;a href='https://github.com/rikiji'&gt;github&lt;/a&gt; and commented here. Please note that modules/patches described here won&amp;#8217;t always be useful as they are just intended to increase linux kernel hacking experience.&lt;/p&gt;
+
+&lt;h2 id='task'&gt;Task&lt;/h2&gt;
+
+&lt;p&gt;The first proposed task is to develop a &lt;strong&gt;kernel module&lt;/strong&gt; aimed to check the &lt;strong&gt;ARP table&lt;/strong&gt; to detect when something fishy is going on. Requisites:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Solution has to be a &lt;strong&gt;kernel module&lt;/strong&gt;, as it can be done without harming the kernel tree. ARP checking can be easily done in user space reading /proc/net/arp but that won&amp;#8217;t help in undestanding how the linux kernel works.&lt;/li&gt;
+
+&lt;li&gt;run checks at regular &lt;strong&gt;intervals of time&lt;/strong&gt; without any busy waiting.&lt;/li&gt;
+
+&lt;li&gt;Checks should detect &lt;strong&gt;duplicated entries&lt;/strong&gt; in the ARP table. That&amp;#8217;s an acceptable approssimation to detect arp spoofing.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id='hints'&gt;Hints&lt;/h2&gt;
+
+&lt;p&gt;Some way to efficiently parse the kernel source tree is mandatory, oneliner below does the trick:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;find . -regex &amp;quot;.*\\.\([ch]\)&amp;quot; -exec grep -Hn $1 {} \;[/sh]
+Symbols accessible from modules are explicitly exported by following macros:
+
+ * `EXPORT_SYMBOL(..)`
+ * `EXPORT_SYMBOL_GPL(..)`
+
+so running the previous line of code within `linux-2.6.38.2/net/ipv4` results in a lot of matches, which grepped again for __arp__ lead to a reasonable amount of lines.
+[sh=plain]
+./arp.c:119:EXPORT_SYMBOL(clip_tbl_hook);
+./arp.c:202:EXPORT_SYMBOL(arp_tbl);
+./arp.c:515:EXPORT_SYMBOL(arp_find);
+./arp.c:718:EXPORT_SYMBOL(arp_create);
+./arp.c:728:EXPORT_SYMBOL(arp_xmit);
+./arp.c:754:EXPORT_SYMBOL(arp_send);
+./arp.c:1160:EXPORT_SYMBOL(arp_invalidate);
+./netfilter/arp_tables.c:61:EXPORT_SYMBOL_GPL(arpt_alloc_initial_table);
+./netfilter/arp_tables.c:1900:EXPORT_SYMBOL(arpt_register_table);
+./netfilter/arp_tables.c:1901:EXPORT_SYMBOL(arpt_unregister_table);
+./netfilter/arp_tables.c:1902:EXPORT_SYMBOL(arpt_do_table);&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;arp_tb&lt;/code&gt; looks like a good place to start from.&lt;/p&gt;
+
+&lt;h2 id='solution'&gt;Solution&lt;/h2&gt;
+
+&lt;p&gt;&lt;code&gt;arp_tbl&lt;/code&gt; is an instance of a more general table &lt;code&gt;struct neigh_table&lt;/code&gt;, which is used to keep track of associations between network and data link layers. Likely there&amp;#8217;s a set of functions ready to parse it laying somewhere in the kernel tree. &lt;code&gt;net/core/neighbour.c&lt;/code&gt; can be found with the same combination of find and grep cited above. The function needed is &lt;code&gt;neigh_for_each&lt;/code&gt;, which is also conveniently exported to modules. Function usage can be learnt by &lt;code&gt;./decnet/dn_neigh.c:535:&lt;/code&gt;. Note that &lt;code&gt;nr_neigh_for_each&lt;/code&gt; is not the same.&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;neigh_for_each&lt;/code&gt; requires a callback function that will be called once for every entry in the table. Optional argument is not required in this case.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;void neigh_handler(struct neighbour * n, void * null)
+{
+  struct neigh_list_t *tmp;
+  int found = 0;
+  char hbuffer[HBUFFERLEN];
+
+  /* search */
+  list_for_each_entry(tmp, &amp;amp;neigh_list.list, list) {
+    if(memcmp(n-&amp;gt;ha,tmp-&amp;gt;ha,n-&amp;gt;dev-&amp;gt;addr_len)==0) {
+      format_hwaddr(n-&amp;gt;ha, n-&amp;gt;dev-&amp;gt;addr_len, hbuffer);
+      printk(KERN_ALERT &amp;quot;duplicated entry: %s\n&amp;quot;, hbuffer);
+      found = 1;
+    }
+  }
+  
+  /* add an entry */
+  if(!found) {
+    struct neigh_list_t * new_entry = (struct neigh_list_t *) kmalloc(sizeof(struct neigh_list_t), GFP_KERNEL);
+    memcpy(new_entry-&amp;gt;ha,n-&amp;gt;ha,n-&amp;gt;dev-&amp;gt;addr_len);
+    memcpy(new_entry-&amp;gt;primary_key,n-&amp;gt;primary_key,sizeof(u8 *));
+    list_add(&amp;amp;(new_entry-&amp;gt;list), &amp;amp;(neigh_list.list));
+  }  
+}&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Standard kernel data structures have been used to keep track of previous entries. A list is filled with IP and MAC addresses and then compared to each new neighbour entry. When a MAC address is not found in the current list it will be added at the end of the loop. When a MAC has already be seen instead, &lt;code&gt;&amp;quot;duplicated entry: XX:XX:XX:XX:XX:XX&amp;quot;&lt;/code&gt; is printed and visible through &lt;strong&gt;dmesg&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;To run this check every N seconds kernel &lt;strong&gt;workqueues&lt;/strong&gt; have been chosen.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;static struct workqueue_struct * workq;
+static DECLARE_DELAYED_WORK(work, arp_tbl_check);
+...
+workq = create_singlethread_workqueue(&amp;quot;arp_tbl_check_wq&amp;quot;);
+queue_delayed_work(workq, &amp;amp;work, HZ * 5);&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;For this case a simple single-thread single-work queue would suffice.&lt;code&gt;HZ * 5&lt;/code&gt; sets the next run at approximately 5 seconds of jiffies away. Grab &lt;a href='https://github.com/rikiji/arpcheck'&gt;full code&lt;/a&gt;.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Vehicle classification</title>
+   <link href="http://rikiji.it/2011/01/27/Vehicle-classification.html"/>
+   <updated>2011-01-27T00:00:00+01:00</updated>
+   <id>http://rikiji.it/2011/01/27/Vehicle-classification</id>
+   <content type="html">&lt;p&gt;I improved my ruby motion recognition library, &lt;a href='https://github.com/rikiji/rmotion]'&gt;RMotion&lt;/a&gt;, to provide object classification features. Currently it has been tested on vehicles, expecially on cars shapes. In the following demo video it is configured to recognize cars (red label) and filter out everything else (blue label). Cars which are within the camera only by an half are not classified as matching, and that&amp;#8217;s the intended behaviour since their shape isn&amp;#8217;t looking like a car one.&lt;/p&gt;
+&lt;div class='youtube'&gt;&lt;center&gt;&lt;iframe frameborder='0' height='300' src='http://www.youtube.com/embed/1wxg4nUQ_DA' width='80%'&gt;        &lt;/iframe&gt;&lt;/center&gt;&lt;/div&gt;
+&lt;p&gt;Video is deliberately slowed down, since here in front of my window people drive insanely fast! As usual i&amp;#8217;ll write some documentation and usage examples and post them here.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>ruby-memscan 0.01</title>
+   <link href="http://rikiji.it/2010/11/12/ruby-memscan-0.01.html"/>
+   <updated>2010-11-12T00:00:00+01:00</updated>
+   <id>http://rikiji.it/2010/11/12/ruby-memscan-0.01</id>
+   <content type="html">&lt;p&gt;First version of ruby-memscan (my ruby memory scanning API) completed and &lt;a href='https://github.com/rikiji/ruby-memscan'&gt;pushed to github&lt;/a&gt;! Features heap, stack, bss and data dumping into arrays of ulong values and basic (long) search at the moment.&lt;/p&gt;
+
+&lt;p&gt;Sample usage is found inside &lt;strong&gt;test&lt;/strong&gt; subdirectory:&lt;code&gt;make&lt;/code&gt; and run &lt;code&gt;./test&lt;/code&gt; then ruby test.rb $(pidof test)&lt;/p&gt;
+
+&lt;p&gt;Here follows &lt;a href='https://github.com/rikiji/ruby-memscan/blob/master/test/test.rb'&gt;test.rb&lt;/a&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;require &amp;#39;memscan&amp;#39;
+require &amp;#39;pp&amp;#39;
+
+m= Memscan.new
+
+pid= ARGV[0].to_i
+m.attach pid
+
+puts m.dump_stack.size
+puts  m.dump_heap.size
+
+pp m.search_long 3735928559
+pp m.search_long 3405691582&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;When run against test.c it will print at least two positive matches.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Ruby memory scanning API</title>
+   <link href="http://rikiji.it/2010/11/04/Ruby-memory-scanning-API.html"/>
+   <updated>2010-11-04T00:00:00+01:00</updated>
+   <id>http://rikiji.it/2010/11/04/Ruby-memory-scanning-API</id>
+   <content type="html">&lt;p&gt;I&amp;#8217;m writing down some code to access other processes memory from ruby scripts. Even if it&amp;#8217;s still in an early form, i&amp;#8217;m pushing regular (working?) updates on &lt;a href='https://github.com/rikiji/ruby-memscan'&gt;this github repo&lt;/a&gt;. The extension won&amp;#8217;t definitely work on anything different than x86 Linux.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Mount root as tmpfs</title>
+   <link href="http://rikiji.it/2010/09/13/Mount-root-as-tmpfs.html"/>
+   <updated>2010-09-13T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/09/13/Mount-root-as-tmpfs</id>
+   <content type="html">&lt;p&gt;Originally written on 23/10/2009, i&amp;#8217;m posting it again since some external links were pointing to it.&lt;/p&gt;
+
+&lt;p&gt;So you just got a brand new laptop with an insane chunk of ram, like 4GB or so and you are afraid it won&amp;#8217;t be ever used at all&amp;#8230; You can take advantage of it to have your debian linux box run insanely fast. This process can be easily ported to distributions other than mine but this won&amp;#8217;t be covered. Let&amp;#8217;s begin. Our aim is to load your whole root partition into ram, so every binary, shared library, tmp file and so will be instantly accessed. My advice is to keep &lt;code&gt;/&lt;/code&gt; and &lt;code&gt;/home&lt;/code&gt; on different partitions, so you can still save your files and configs with little access to the disk.&lt;/p&gt;
+
+&lt;p&gt;Boot into your system and clean up as much as you can, because every useless MB you leave on &lt;code&gt;/&lt;/code&gt; means less memory available later. apt-get clean rm -R /usr/src/* &amp;#8230;&lt;/p&gt;
+
+&lt;p&gt;Here comes the magic: backup the script &amp;#8220;/usr/share/initramfs-tools/scripts/local&amp;#8221; and hack it to mount root as tmpfs, here&amp;#8217;s my patch file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;--- local_orig  2009-03-13 08:46:21.000000000 +0100
++++ local_rikiji        2009-03-13 08:58:10.000000000 +0100
+@@ -117,8 +117,17 @@
+ 
+        # FIXME This has no error checking
+        # Mount root
+-       mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
+-
++       # mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
++       TMPRAMROOT=&amp;quot;/ramroot&amp;quot;
++       mkdir $TMPRAMROOT
++       mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} $TMPRAMROOT
++       mount -t tmpfs none ${rootmnt}
++       cd ${rootmnt}
++       echo &amp;quot;Unpacking root into ram...&amp;quot;
++       tar -xf &amp;quot;$TMPRAMROOT/packedroot.tar&amp;quot;
++       echo &amp;quot;Done.&amp;quot;
++       umount $TMPRAMROOT
++      
+        [ &amp;quot;$quiet&amp;quot; != &amp;quot;y&amp;quot; ] &amp;amp;&amp;amp; log_begin_msg &amp;quot;Running /scripts/local-bottom&amp;quot;
+        run_scripts /scripts/local-bottom
+        [ &amp;quot;$quiet&amp;quot; != &amp;quot;y&amp;quot; ] &amp;amp;&amp;amp; log_end_msg&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then it should appear like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;# Comment out the usual roofs mount
+# mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
+TMPRAMROOT=&amp;quot;/ramroot&amp;quot;
+mkdir $TMPRAMROOT
+mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} $TMPRAMROOT
+mount -t tmpfs none ${rootmnt}
+cd ${rootmnt}
+echo &amp;quot;Unpacking root into ram...&amp;quot;
+tar -xf &amp;quot;$TMPRAMROOT/packedroot.tar&amp;quot;
+echo &amp;quot;Done.&amp;quot;
+umount $TMPRAMROOT&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Let&amp;#8217;s build the &lt;code&gt;initrd&lt;/code&gt; image:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;mkinitramfs -o /boot/initrd.img-`uname -r`-ramroot&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and add an adequate bootloader entry, this is mine for grub&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;title RamRoot fscking fast Debian GNU/Linux, kernel 2.6.26-1-686-bigmem
+root (hd0,1)
+kernel /boot/vmlinuz-2.6.26-1-686-bigmem root=/dev/sda2 ro quiet
+initrd /boot/initrd.img-2.6.26-1-686-bigmem-ramroot&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now fire up you favourite live CD and pack your root. I avoided gzipping it to speedup unpacking process (that happens every boot). Something like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;tar -cf /mnt/sda3/packedroot.tar /mnt/sda2/*
+mv /mnt/sda3/packedroot.tar /mnt/sda2/&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And you&amp;#8217;re done! Reboot and enjoy your amazingly fast system!&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>RMotion doc part 2</title>
+   <link href="http://rikiji.it/2010/07/08/RMotion-doc-part-2.html"/>
+   <updated>2010-07-08T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/07/08/RMotion-doc-part-2</id>
+   <content type="html">&lt;p&gt;Second part of RMotion documentation. Motion objects methods &lt;code&gt;vid&lt;/code&gt; and &lt;code&gt;cam&lt;/code&gt; yield information about moving objects to the passed block. m=Motion.new m.cam do |e| &amp;#8230; end&lt;/p&gt;
+
+&lt;p&gt;Those informations are organized as an array of &lt;code&gt;Entity&lt;/code&gt; instances. So far up to 8 different objects can be recognized. Entities array entries are ordered by size, so the bigger-faster moving one will be first. Entities methods are &lt;code&gt;center&lt;/code&gt; and &lt;code&gt;corners&lt;/code&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;m=Motion.new
+m.cam do |e| 
+  p e.first.center
+  p e.first.corners
+end &lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and that&amp;#8217;s the output produced, in the form&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;[:x,:y]
+[:topleftx,:toplefty,:bottomrightx,:bottomrighty]
+
+nil
+[nil, nil, nil, nil]
+[416, 68]
+[320, 0, 512, 136]
+[356, 36]
+[320, 0, 392, 72]
+...&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;To track current entities could be useful to keep each entity at the same array index even when others disappear, so that&amp;#8217;s the meaning of class method &lt;code&gt;reorder&lt;/code&gt;. &lt;code&gt;Entity.status&lt;/code&gt; returns an initialized empty array, so it can be used to store last frame entity information. &lt;code&gt;Entity.reorder&lt;/code&gt; takes the reference array and the new generated one and places everything where it should be.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;m=Motion.new
+status=Entity.status
+m.cam do |e| 
+  Entity.reorder status, e
+  status.each_with_index do |s,n|
+    puts &amp;quot;Entity #{n} is in position #{s.center.inspect}&amp;quot; unless s.center.nil?
+  end
+end &lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;vid&lt;/code&gt; can read a video file and acts like cam. To quite the loop you can execute &lt;code&gt;m.quit&lt;/code&gt; or hit b on you keyboard, unless you previously set &lt;code&gt;m.show=false&lt;/code&gt;.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;m=Motion.new
+i=0
+m.vid(&amp;quot;capture.avi&amp;quot;) do |e|
+  m.quit if i &amp;gt; 100
+  i+=1
+end &lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I&amp;#8217;m posting the gem to github and rubygems as soon as possible.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>RMotion doc</title>
+   <link href="http://rikiji.it/2010/06/22/RMotion-doc.html"/>
+   <updated>2010-06-22T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/06/22/RMotion-doc</id>
+   <content type="html">&lt;p&gt;RMotion provides a simple interface to build motion detection software in ruby. At the moment it&amp;#8217;s still under test, i need to try it with different webcams before releasing it. If you have a webcam that works on linux and would like to try it now just drop me an email!&lt;/p&gt;
+
+&lt;p&gt;&lt;a href='http://www.rikiji.it/post/14'&gt;Last time&lt;/a&gt; i showed up with a demo of car motion detection with some noise and green cells to mark movements. Now RMotion is much more configurable, both noise selection and output marking are customizable. This is how RMotion runs with default options:&lt;/p&gt;
+&lt;div class='youtube'&gt;&lt;center&gt;&lt;iframe frameborder='0' height='300' src='http://www.youtube.com/embed/HNL-2pNkuSo' width='80%'&gt;        &lt;/iframe&gt;&lt;/center&gt;&lt;/div&gt;
+&lt;p&gt;Now let&amp;#8217;s see in &lt;strong&gt;irb&lt;/strong&gt; some configuration options. Require the lib, instantiate the main object and print default options:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;irb(main):001:0&amp;gt; require &amp;#39;rmotion&amp;#39;
+=&amp;gt; true
+irb(main):002:0&amp;gt; m=Motion.new
+=&amp;gt; #&amp;lt;Motion:0xb74d14a0&amp;gt;
+irb(main):003:0&amp;gt; m.show?
+=&amp;gt; true
+irb(main):004:0&amp;gt; m.write?
+=&amp;gt; false
+irb(main):005:0&amp;gt; m.fft?
+=&amp;gt; true&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;show&lt;/code&gt;, &lt;code&gt;write&lt;/code&gt; and &lt;code&gt;fft&lt;/code&gt; are the most important options. When &lt;code&gt;show&lt;/code&gt; is true the video analyzed is also displayed in a window. You can set &lt;code&gt;write&lt;/code&gt; to a string (a filename) to save the video analyzed to a file! Both displayed and saved video will have motion detection markings on it, like the video i just showed to you.&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;fft&lt;/code&gt; manages how the video frames are processed (fast fourier transform or direct): i recommend to set it always true, except in case your cpu isn&amp;#8217;t fast enough to follow the stream in realtime. Soon i&amp;#8217;ll post an in-depth analysis of what&amp;#8217;s the difference between &lt;code&gt;fft=true&lt;/code&gt; and &lt;code&gt;fft=false&lt;/code&gt;.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;irb(main):006:0&amp;gt; m.fill?
+=&amp;gt; true
+irb(main):007:0&amp;gt; m.rect?
+=&amp;gt; false
+irb(main):008:0&amp;gt; m.point?
+=&amp;gt; false&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next group of options is about output frames: &lt;code&gt;fill&lt;/code&gt; default true behaves like the previous video, &lt;code&gt;rect&lt;/code&gt; draws rectangles around moving objects and &lt;code&gt;point&lt;/code&gt; draws instead a small circle centered on the object. Let&amp;#8217;s see them! Note that i can swap them live!&lt;/p&gt;
+&lt;div class='youtube'&gt;&lt;center&gt;&lt;iframe frameborder='0' height='300' src='http://www.youtube.com/embed/0LQIt0XiWqE' width='80%'&gt;        &lt;/iframe&gt;&lt;/center&gt;&lt;/div&gt;
+&lt;pre&gt;&lt;code&gt;irb(main):012:0&amp;gt; m.threshold_fft?
+=&amp;gt; 1.0
+irb(main):013:0&amp;gt; m.threshold_direct?
+=&amp;gt; 8.0
+irb(main):014:0&amp;gt; m.threshold_distance?
+=&amp;gt; 9.0
+irb(main):015:0&amp;gt; m.threshold_group?
+=&amp;gt; 20&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;threshold_fft&lt;/code&gt; and &lt;code&gt;threshold_direct&lt;/code&gt; values influence what is recognized as noise and what as an object. Note that they are used in a mutually exclusive way: if &lt;code&gt;fft&lt;/code&gt; is true then &lt;code&gt;threshold_direct&lt;/code&gt; won&amp;#8217;t affect result. Same for &lt;code&gt;fft&lt;/code&gt; as false and &lt;code&gt;threshold_fft&lt;/code&gt;. Play with those value to fit your enviroment (light, object speed..).&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;threshold_distance&lt;/code&gt; and &lt;code&gt;threshold_group&lt;/code&gt; also have a role on recognizing objects: an object is a group of al least &lt;strong&gt;group&lt;/strong&gt; cells distant each other no more than &lt;strong&gt;distance&lt;/strong&gt;. So you can choose min size of objects and spread of cells. Cells are a group of pixel determined dynamically on camera resolution, so don&amp;#8217;t worry about it.&lt;/p&gt;
+
+&lt;p&gt;Next time i&amp;#8217;ll talk about capture loop and Entities.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>compilers!</title>
+   <link href="http://rikiji.it/2010/06/21/compilers.html"/>
+   <updated>2010-06-21T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/06/21/compilers</id>
+   <content type="html">&lt;p&gt;Actually it&amp;#8217;s not really about &amp;#8220;ebooks&amp;#8221;&amp;#8230; but it makes sense, since this is the first time since months i&amp;#8217;m buying a paper book instead of a digital one! (so i can bring it to the beach)&lt;/p&gt;
+
+&lt;p&gt;&lt;a href='http://rikiji.it/data/20100621174.jpg'&gt;&lt;img alt='dragon book' src='http://rikiji.it/data/tb-20100621174.jpg' /&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;It&amp;#8217;s the &lt;a href='http://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools'&gt;dragon book&lt;/a&gt;, an ancient 1986 edition! Awesome. Today amazon sent me also &amp;#8220;modern compiler implementation&amp;#8221; (appel), let&amp;#8217;s see which one is more interesting.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>github repositories</title>
+   <link href="http://rikiji.it/2010/06/20/github-repositories.html"/>
+   <updated>2010-06-20T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/06/20/github-repositories</id>
+   <content type="html">&lt;p&gt;I just created a new github repository to host source code of &lt;a href='http://www.rikiji.it/post/12'&gt;rwiimote&lt;/a&gt;, so who&amp;#8217;s interested can take a look at the &lt;a href='http://github.com/rikiji/rwiimote/blob/master/ext/rwiimote/rwiimote.c'&gt;source&lt;/a&gt; easily.&lt;/p&gt;
+
+&lt;p&gt;I also added a repo named &lt;a href='url=http://github.com/rikiji/rmotion'&gt;rmotion&lt;/a&gt; to host code related to &lt;a href='url=http://www.rikiji.it/post/14'&gt;this&lt;/a&gt; previous entry. The leading &lt;code&gt;r&lt;/code&gt; as you already have understood means that it will be packaged as a ruby gem. I already got a full working version but it does need some more testing before release, so keep looking for updates.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>c2epub</title>
+   <link href="http://rikiji.it/2010/05/30/c2epub.html"/>
+   <updated>2010-05-30T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/05/30/c2epub</id>
+   <content type="html">&lt;p&gt;On my github &lt;a href='http://github.com/rikiji]'&gt;repository&lt;/a&gt; you can now find an alpha version of my c-to-epub conversion tool. c2epub is a tool able to generate ebooks in the EPUB format packaging c source code.&lt;/p&gt;
+
+&lt;p&gt;It is different from other epub generating software since default font of generated ebooks is a fixed width one. Blank lines, spaces, tabs are preserved and it provides C syntax highlight. You can choose to package a group of source files together or process them one by one creating different epubs.&lt;/p&gt;
+
+&lt;p&gt;Run it with -h to get the usage help. Default is single output file, no syntax highlight&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;usage: c2epub [options] [source files...]
+source files have to be in the same directory you run c2epub.
+  -t title package title (output filename base)
+  -g       enable grayscale
+  -m       multiple files output
+  -h       print this help
+  -v       print version information&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Get source and binary &lt;a href='http://github.com/rikiji/c2epub'&gt;here&lt;/a&gt;.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Motion detect video demo</title>
+   <link href="http://rikiji.it/2010/05/17/Motion-detect-video-demo.html"/>
+   <updated>2010-05-17T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/05/17/Motion-detect-video-demo</id>
+   <content type="html">&lt;p&gt;I&amp;#8217;m working on a basic although rather complete framework to recognize moving objects on webcam video streams. You can enjoy a demo on this &lt;a href='http://www.youtube.com/watch?v=_MVFwVuGeyg'&gt;youtube video&lt;/a&gt;:&lt;/p&gt;
+&lt;div class='youtube'&gt;&lt;center&gt;&lt;iframe frameborder='0' height='300' src='http://www.youtube.com/embed/_MVFwVuGeyg' width='80%'&gt;        &lt;/iframe&gt;&lt;/center&gt;&lt;/div&gt;
+&lt;p&gt;Today it&amp;#8217;s windy so some green squares appear also above trees and brushes! Cars and walking people are recognized and tracked from one side to the other of the viewport. Many kind of informations about moving entities will be available to applications, and the algorithm is heavily customizable since different cameras record different levels of noise.. At the moment I&amp;#8217;m focusing on speed to reach acceptable fps even on slow machines, then i just have to package it as a library, provide some documentation and post it here.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>Rwiimote gem available</title>
+   <link href="http://rikiji.it/2010/05/09/Rwiimote-gem-available.html"/>
+   <updated>2010-05-09T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/05/09/Rwiimote-gem-available</id>
+   <content type="html">&lt;p&gt;I just pushed to &lt;a href='http://rubygems.org]'&gt;rubygems&lt;/a&gt; my first gem!! It&amp;#8217;s called &lt;a href='http://rubygems.org/gems/rwiimote'&gt;rwiimote&lt;/a&gt;, it&amp;#8217;s a wrapper around &lt;strong&gt;libcwiimote3&lt;/strong&gt;, which provides some bindings to control wiimotes over bluetooth. To install:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;gem install rwiimote&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Included within the gem there&amp;#8217;s a &lt;code&gt;README&lt;/code&gt; that provides some documentation, along with some usage examples. Let&amp;#8217;s analyze them here:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;w=Wiimote.new
+
+# w.connect requires mac address of device to connect to. find it by running &amp;quot;hcitool scan&amp;quot; just after you hit 1&amp;amp;2 on your wiimote
+
+puts &amp;quot;press both 1 and 2 keys to connect&amp;quot;
+exit unless w.connect &amp;quot;00:11:22:33:44:55&amp;quot;
+puts &amp;quot;connected!&amp;quot;
+
+# you can turn those fancy blue leds on or off by calling on/off methods on them 
+w.led[1].on
+w.led[2].off
+
+puts &amp;quot;click home to disconnect&amp;quot;
+while w.open?
+  # w.update has to be called every time you want to send/receive new data to/from the device. usually it&amp;#39;s at the beginning of a loop like this 
+  w.disconnect unless w.update
+  
+  # check if button &amp;quot;a&amp;quot; was pressed
+  puts &amp;quot;a!&amp;quot; if w.a?
+
+  # disconnect if button &amp;quot;home&amp;quot; was pressed
+  w.disconnect if w.home?
+end&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The second one shows how to access the force data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;w=Wiimote.new
+exit unless w.connect &amp;quot;00:11:22:33:44:55&amp;quot;
+
+# turn on accelerometer
+w.acc= true
+
+puts &amp;quot;shake to disconnect!!&amp;quot;
+while w.open?
+  w.disconnect unless w.update
+
+  #	print information about each axis of the accelerometer
+  puts &amp;quot;force x: &amp;quot; + w.force_x.to_s
+  puts &amp;quot;force y: &amp;quot; + w.force_y.to_s
+  puts &amp;quot;force z: &amp;quot; + w.force_z.to_s
+
+  # disconnect if you were shaking too hard :)
+  w.disconnect if w.force &amp;gt; 2
+end&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;There are some other methods available, check them in the &lt;code&gt;README&lt;/code&gt; file. Drop me a line if something does not work or if you just have some questions about it.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>SideSlide</title>
+   <link href="http://rikiji.it/2010/05/05/SideSlide.html"/>
+   <updated>2010-05-05T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/05/05/SideSlide</id>
+   <content type="html">&lt;p&gt;On &lt;a href='http://rikiji.it/data/sideslide/'&gt;this page&lt;/a&gt; you can find a live demo of a script emulating a gui effect well known to users of a particular music player. Hovering with your mouse the images will cause them to slide one by one. Faster you move faster they will swap. I wrote it to be really easy to setup, just add &lt;img /&gt; tags withing a parent class &amp;#8220;sideslide&amp;#8221; like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;div class=&amp;quot;sideslide&amp;quot;&amp;gt; 
+&amp;lt;img src=&amp;quot;m/Alive - Daft Punk.jpg&amp;quot;&amp;gt; 
+&amp;lt;img src=&amp;quot;m/Daft Club - Daft Punk.jpg&amp;quot;&amp;gt; 
+&amp;lt;img src=&amp;quot;m/Discovery - Daft Punk.jpg&amp;quot;&amp;gt; 
+&amp;lt;img src=&amp;quot;m/Homework - Daft Punk.jpg&amp;quot;&amp;gt; 
+&amp;lt;img src=&amp;quot;m/Human After All - Daft Punk.jpg&amp;quot;&amp;gt; 
+&amp;lt;/div&amp;gt;&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Don&amp;#8217;t forget to include &lt;a href='http://rikiji.it/data/sideslide/sideslide.js'&gt;sideslide.js&lt;/a&gt; and jQuery to your page. Chek the live demo to find out more.&lt;/p&gt;</content>
+ </entry>
+ 
+ <entry>
+   <title>OpenCV gem patch</title>
+   <link href="http://rikiji.it/2010/05/02/OpenCV-gem-patch.html"/>
+   <updated>2010-05-02T00:00:00+02:00</updated>
+   <id>http://rikiji.it/2010/05/02/OpenCV-gem-patch</id>
+   <content type="html">&lt;p&gt;I had to fix some lines of the gem source code in order to build it correctly on my debian machine.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;iplimage.cpp: In function ‘VALUE mOpenCV::cIplImage::rb_initialize(int, VALUE*, VALUE)’:
+iplimage.cpp:91: error: ‘cvCvToIplDepth’ was not declared in this scope
+iplimage.cpp: In function ‘VALUE mOpenCV::cIplImage::new_object(int, int, int)’:
+iplimage.cpp:228: error: ‘cvCvToIplDepth’ was not declared in this scope
+iplimage.cpp: In function ‘VALUE mOpenCV::cIplImage::new_object(CvSize, int)’:
+iplimage.cpp:234: error: ‘cvCvToIplDepth’ was not declared in this scope
+make: *** [iplimage.o] Error 1&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Here&amp;#8217;s the fix&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;--- iplimage.cpp	1970-01-01 01:00:00.000000000 +0100 
++++ _iplimage.cpp	2010-04-16 09:59:23.000000000 +0200 
+@@ -88,7 +88,7 @@ 
+rb_scan_args(argc, argv, &amp;quot;22&amp;quot;, &amp;amp;width, &amp;amp;height, &amp;amp;depth, &amp;amp;channel); 
+int _depth = argc &amp;lt; 3 ? CV_8U : FIX2INT(depth); 
+int _channel = argc &amp;lt; 4 ? 3 : FIX2INT(channel); 
+- DATA_PTR(self) = cvCreateImage(cvSize(FIX2INT(width), FIX2INT(height)), cvCvToIplDepth(_depth), _channel); 
++ DATA_PTR(self) = cvCreateImage(cvSize(FIX2INT(width), FIX2INT(height)), cvIplDepth(_depth), _channel); 
+return self; 
+} 
+
+@@ -225,13 +225,13 @@ 
+VALUE 
+new_object(int width, int height, int type) 
+{ 
+- return OPENCV_OBJECT(rb_klass, cvCreateImage(cvSize(width, height), cvCvToIplDepth(type), CV_MAT_CN(type))); 
++ return OPENCV_OBJECT(rb_klass, cvCreateImage(cvSize(width, height), cvIplDepth(type), CV_MAT_CN(type))); 
+} 
+
+VALUE 
+new_object(CvSize size, int type) 
+{ 
+- return OPENCV_OBJECT(rb_klass, cvCreateImage(size, cvCvToIplDepth(type), CV_MAT_CN(type))); 
++ return OPENCV_OBJECT(rb_klass, cvCreateImage(size, cvIplDepth(type), CV_MAT_CN(type))); 
+} 
+
+__NAMESPACE_END_IPLIMAGE &lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;then just run as usual&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;ruby extconf.rb 
+make&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and place opencv.so in your ruby lib path. You will need libffcall1-dev to build the GUI module, otherwise opencv will build cleanly but without gui support.&lt;/p&gt;</content>
+ </entry>
+ 
+ 
+</feed>

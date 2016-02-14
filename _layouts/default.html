@@ -1,20 +1,66 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>{{ page.title }}</title>
+    <meta name="author" content="@rikiji">
+    <meta name="description" content="a blog">
+    <meta name="viewport" content="width=device-width">
+    <link href="atom.xml" type="application/atom+xml" rel="alternate">
 
-  {% include head.html %}
-
+    <meta name="viewport" content="width=device-width">
+    <link rel="stylesheet" href="/styles/main.css">
+    <script src="/scripts/vendor/modernizr.js"></script>
+    <script src="/scripts/vendor/jquery-1.9.1.min.js"></script>
+    {% raw %}
+    <script type="text/javascript">
+      var addthis_config = {"data_track_clickback":false };
+      var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
+    </script>
+    {% endraw %}
+    <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
+    <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
+    <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
+    <link href="http://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300" rel="stylesheet" type="text/css">
+  </head>
   <body>
 
-    {% include header.html %}
+    <!--[if lt IE 7]>
+        <p class="chromeframe">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">activate Google Chrome Frame</a> to improve your experience.</p>
+    <![endif]-->
 
-    <div class="page-content">
-      <div class="wrapper">
-        {{ content }}
+    <div class="row-fluid">
+      <div id="content" class="span9">
+	{{ content }}
+      </div>
+      <div id="sidebar" class="span3">
+	<div class="sidebar-nav sidebar-nav-fixed">
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
+	  <hr>
+	  <ul class="unstyled">
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
+	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
+	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
+	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
+	  </ul>
+	</div>
       </div>
     </div>
 
-    {% include footer.html %}
+    <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
+    <script>
+      var _gaq=[['_setAccount','UA-30381469-1'],['_trackPageview']];
+      (function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+      g.src=('https:'==location.protocol?'//ssl':'//www')+'.google-analytics.com/ga.js';
+      s.parentNode.insertBefore(g,s)}(document,'script'));
+    </script>
 
+    <script src="/scripts/main.js"></script>
   </body>
-
 </html>
