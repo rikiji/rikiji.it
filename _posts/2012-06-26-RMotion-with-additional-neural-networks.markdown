@@ -8,7 +8,7 @@ I subsequentely added classifying features: as you can see in the [previous vide
 
 The improvement from my last post is the classification of multiple classes of objects instead of a single one, and the removal of the edge effect that occurred when the object was not fully in view. The video is slowed down at approx. 30% to make the labels visible for humans!
 
-{% youtube IsNLzhu_BKM %}
+http://www.youtube.com/watch?v=IsNLzhu_BKM
 
 Unfortunately the manual work for the user increases linearly with the number of classes to detect. Currently i'm using multiple neural networks ( __supervised learning__ ) as a classifier, and human intervention is necessary to decide which shapes belong to a class and which are noise before training the net. After that the shapes are generated, the user places them in appropriately labeled directories and then a training script does everything automatically:
 

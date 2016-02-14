@@ -5,9 +5,7 @@ title: RMotion doc
 RMotion provides a simple interface to build motion detection software in ruby.
 At the moment it's still under test, i need to try it with different webcams before releasing it. If you have a webcam that works on linux and would like to try it now just drop me an email!
 
-[Last time](http://www.rikiji.it/post/14) i showed up with a demo of car motion detection with some noise and green cells to mark movements. Now RMotion is much more configurable, both noise selection and output marking are customizable. This is how RMotion runs with default options:
-
-{% youtube HNL-2pNkuSo %}
+[Last time](http://www.rikiji.it/post/14) i showed up with a demo of car motion detection with some noise and green cells to mark movements. Now RMotion is much more configurable, both noise selection and output marking are customizable. This is how RMotion runs with default options: http://www.youtube.com/watch?v=HNL-2pNkuSo
 
 Now let's see in __irb__ some configuration options. Require the lib, instantiate the main object and print default options:
 
@@ -34,8 +32,7 @@ Now let's see in __irb__ some configuration options. Require the lib, instantiat
     => false
 
 Next group of options is about output frames: `fill` default true behaves like the previous video, `rect` draws rectangles around moving objects and `point` draws instead a small circle centered on the object. Let's see them! Note that i can swap them live!
-
-{% youtube 0LQIt0XiWqE %}
+http://www.youtube.com/watch?v=0LQIt0XiWqE
 
     irb(main):012:0> m.threshold_fft?
     => 1.0
