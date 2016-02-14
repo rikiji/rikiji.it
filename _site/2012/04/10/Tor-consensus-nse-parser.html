@@ -16,12 +16,10 @@
     <link rel="stylesheet" href="/styles/main.css">
     <script src="/scripts/vendor/modernizr.js"></script>
     <script src="/scripts/vendor/jquery-1.9.1.min.js"></script>
-    
     <script type="text/javascript">
       var addthis_config = {"data_track_clickback":false };
-      var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
+      var addthis_share = {templates : {twitter : ": "}}      
     </script>
-    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,19 +33,72 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	{{ content }}
+	<div class="top">
+  <h2><a href="http://rikiji.it/2012/04/10/Tor-consensus-nse-parser.html">Tor consensus nse parser</a></h2>
+  <h3>April 10 2012</h3>
+</div>
+<div class="post">
+  
+  <p>Today I quickly translated a python script i had floating around into a more useful <a href="http://nmap.org/nsedoc/">NSE script</a>.</p>
+
+<p>It pulls the consensus data from one of the 9 Tor directory servers (<a href="https://gitweb.torproject.org/tor.git/tree/HEAD:/doc">documentation here</a>) and runs a regular expression to extract the ip addresses of the nodes until it finds a matching one.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>nmap -p0 -dd -Pn --datadir=. --script=tor-consensus-checker 86.59.11.2
+...
+NSE: Starting 'tor-consensus-checker' (thread: 0x9a87568) against 86.59.11.2.
+Initiating NSE at 23:36
+NSE: checking if 86.59.11.2 is a tor relay
+NSE: Final http cache size (674972 bytes) of max size of 1000000
+NSE: consensus retrieved from 128.31.0.39
+NSE: Finished 'tor-consensus-checker' (thread: 0x9a87568) against 86.59.11.2.
+PORT  STATE  SERVICE REASON
+0/tcp closed unknown conn-refused
+
+Host script results:
+| tor-consensus-checker: 
+|_  86.59.11.2 is a tor node
+
+Nmap done: 1 IP address (1 host up) scanned in 1.42 seconds
+</code></pre>
+</div>
+
+<p>The script can currently be found on my <a href="https://github.com/rikiji/nmap-scripts">github repository</a> of nmap scripts.</p>
+
+  
+  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2012/04/10/Tor-consensus-nse-parser.html" addthis:title="Tor consensus nse parser" addthis:description="Today I quickly translated a python script i had floating around into a more useful NSE script. It pulls the...">
+    <a class="addthis_button_reddit"></a>    
+    <a class="addthis_button_facebook"></a>
+    <a class="addthis_button_twitter"></a>
+    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
+    <a class="addthis_counter addthis_bubble_style"></a>
+  </div>
+
+</div>
+<hr>
+
+	<div class="bottom">	  
+	  <div>
+	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
+	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
+	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
+	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+	  </div>
+	  <p class="eof">EOF</p>
+	</div>
+
+
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
+	  <h1><a href="http://rikiji.it">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

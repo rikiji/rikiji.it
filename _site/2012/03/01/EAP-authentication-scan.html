@@ -16,12 +16,10 @@
     <link rel="stylesheet" href="/styles/main.css">
     <script src="/scripts/vendor/modernizr.js"></script>
     <script src="/scripts/vendor/jquery-1.9.1.min.js"></script>
-    
     <script type="text/javascript">
       var addthis_config = {"data_track_clickback":false };
-      var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
+      var addthis_share = {templates : {twitter : ": "}}      
     </script>
-    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,19 +33,97 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	{{ content }}
+	<div class="top">
+  <h2><a href="http://rikiji.it/2012/03/01/EAP-authentication-scan.html">EAP authentication scan</a></h2>
+  <h3>March 01 2012</h3>
+</div>
+<div class="post">
+  
+  <p>I’ve been working on a <a href="http://nmap.org/nsedoc/">NSE script</a> which enumerates the authentication methods available on an eap authenticator, especially useful when those methods that support 2-step authentication with an anonymous identity in the first step are offered.</p>
+
+<p>The principle is straightforward, for a group of auth methods of interest the script will follow the eap handshake sequence multiple times keeping track of the methods offered:</p>
+
+<ol>
+  <li>sending eap start packet to the broadcast mac address <code class="highlighter-rouge">01:80:c2:00:00:03</code></li>
+  <li>responding to the identity request issued by the ap</li>
+  <li>parsing the auth request to find the auth method offered, then responding with a nak packet that requests another method</li>
+  <li>If auth request: <code class="highlighter-rouge">5</code>, if instead failure packet is received: <code class="highlighter-rouge">6</code></li>
+  <li>respond with another nak and another auth method, then again <code class="highlighter-rouge">4</code></li>
+  <li>auth method not available. restart from state <code class="highlighter-rouge">1</code> unless already tested every protocol of interest.</li>
+</ol>
+
+<p>A simple session is given below (relying on my memory, hope to remember everything correctly):</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Eap start
+-- -- -- --
+01 01 00 00
+
+Eap identity request
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+01 00 00 0A 01 EF 00 0A 01 68 65 6C 6C 6F
+
+Eap identity response
+-- -- -- -- -- -- -- -- -- -- -- -- --  
+01 00 00 09 02 EF 00 09 01 75 75 65 72 
+
+EAP PEAP authentication request
+-- -- -- -- -- -- -- -- --  
+01 00 LL LL 01 CD LL LL 19  ... more stuff (LL = length)
+
+EAP NAK response, TTLS requested
+-- -- -- -- -- -- -- -- -- --
+01 00 00 05 02 CD 00 05 03 15
+</code></pre>
+</div>
+
+<p>The script currently enumerates successfully the auth methods when tested with hostapd v0.6.10, it’s on my <a href="https://github.com/rikiji/nmap-scripts">github</a> as well as in the nmap main trunk.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>nmap -e eth2 -sn --script=eap-info --datadir=. localhost
+Pre-scan script results:
+| eap-info:
+| Available authentication methods with identity="anonymous":
+|   true     PEAP
+|   true     EAP-TTLS
+|   false    EAP-TLS
+|_  false    EAP-MSCHAP-V2
+</code></pre>
+</div>
+
+  
+  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2012/03/01/EAP-authentication-scan.html" addthis:title="EAP authentication scan" addthis:description="I’ve been working on a NSE script which enumerates the authentication methods available on an eap authenticator, especially useful when...">
+    <a class="addthis_button_reddit"></a>    
+    <a class="addthis_button_facebook"></a>
+    <a class="addthis_button_twitter"></a>
+    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
+    <a class="addthis_counter addthis_bubble_style"></a>
+  </div>
+
+</div>
+<hr>
+
+	<div class="bottom">	  
+	  <div>
+	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
+	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
+	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
+	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+	  </div>
+	  <p class="eof">EOF</p>
+	</div>
+
+
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
+	  <h1><a href="http://rikiji.it">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

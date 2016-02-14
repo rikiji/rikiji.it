@@ -16,12 +16,10 @@
     <link rel="stylesheet" href="/styles/main.css">
     <script src="/scripts/vendor/modernizr.js"></script>
     <script src="/scripts/vendor/jquery-1.9.1.min.js"></script>
-    
     <script type="text/javascript">
       var addthis_config = {"data_track_clickback":false };
-      var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
+      var addthis_share = {templates : {twitter : ": "}}      
     </script>
-    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,19 +33,60 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	{{ content }}
+	<div class="top">
+  <h2><a href="http://rikiji.it/2011/06/20/Japanese-learning-tool-with-HTML5-interface.html">Japanese learning tool with HTML5 interface</a></h2>
+  <h3>June 20 2011</h3>
+</div>
+<div class="post">
+  
+  <p>I always find useful those language learning tools that are aimed to train a single specific skill among those needed to master a foreign language (one tool one task).
+I was looking for something that could help me to build some knowledge about daily sentences, both in meaning and in pronunciation, showing kanjis while providing also them as kana. Like i did with <strong>playkanji.com</strong> i decided to build an user interface in JavaScript to fulfill the need: <a href="http://teacher.playkanji.com">teacher.playkanji.com</a>.</p>
+
+<p>Japanese suits very well to software development since it isn’t really necessary to have your program translate a sentence (very hard) to help the user with additional info. <a href="http://chasen.naist.jp/hiki/ChaSen/">Chasen</a> provides some help in parsing sentence structure while <a href="http://ftp.monash.edu.au/pub/nihongo/00INDEX.html">Edict</a> is the most famous digital japanese dictionary.</p>
+
+<p>My web application is really <strong>HTML5</strong> dependent, it makes use of some <strong>local storage</strong> functions as well as <strong>audio</strong> tags. You are supposed to read and listen the sentence clicking on the <code class="highlighter-rouge">play ♪</code> button, the if necessary some info (meaning and pronunciation) of displayed kanjis is provided clicking on <code class="highlighter-rouge">kanji help</code> (<code class="highlighter-rouge">help 漢字</code>). While typing your translation in the grey box it will be parsed and evaluated in real time. It will be compared to the reference translation, and matching word will be highlighted in blue. For those interested in the internals of it I’m using the <a href="http://en.wikipedia.org/wiki/Levenshtein_distance]">Levenshtein distance</a> to highlight your words in a blue shade getting darker while they are getting closer to the correct word.
+One limitation of my batch of data is that dictionary references that you will find clicking on <code class="highlighter-rouge">help</code> won’t exatcly match the reference translation, since it would require large amount of manual work to fix. Consider them as a hint and help yourself with some synonyms while messing with Levenshtein output.</p>
+
+<p><strong>HTML5</strong> local storage capabilities let me save the study history within your browser, so there’s no need for login, password and so on: just fire up <a href="http://teacher.playkanji.com">teacher.playkanji.com</a> and enjoy.
+Clicking <code class="highlighter-rouge">clear this result</code> and <code class="highlighter-rouge">clear all history</code> in the right upper side of the page will lead you to reset the current result and the whole history respectively.</p>
+
+<p>Drop me a line if you spot a bug or a bad translation, the app has not been tested thoroughly and i’m still drilling through sentences. Currently supports only <strong>Firefox</strong> and <strong>Chrome</strong>, don’t even bother trying on IE. Opera and safari untested. </p>
+
+  
+  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2011/06/20/Japanese-learning-tool-with-HTML5-interface.html" addthis:title="Japanese learning tool with HTML5 interface" addthis:description="I always find useful those language learning tools that are aimed to train a single specific skill among those needed...">
+    <a class="addthis_button_reddit"></a>    
+    <a class="addthis_button_facebook"></a>
+    <a class="addthis_button_twitter"></a>
+    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
+    <a class="addthis_counter addthis_bubble_style"></a>
+  </div>
+
+</div>
+<hr>
+
+	<div class="bottom">	  
+	  <div>
+	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
+	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
+	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
+	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+	  </div>
+	  <p class="eof">EOF</p>
+	</div>
+
+
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
+	  <h1><a href="http://rikiji.it">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

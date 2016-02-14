@@ -16,12 +16,10 @@
     <link rel="stylesheet" href="/styles/main.css">
     <script src="/scripts/vendor/modernizr.js"></script>
     <script src="/scripts/vendor/jquery-1.9.1.min.js"></script>
-    
     <script type="text/javascript">
       var addthis_config = {"data_track_clickback":false };
-      var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
+      var addthis_share = {templates : {twitter : ": "}}      
     </script>
-    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,19 +33,124 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	{{ content }}
+	<div class="top">
+  <h2><a href="http://rikiji.it/2010/09/13/Mount-root-as-tmpfs.html">Mount root as tmpfs</a></h2>
+  <h3>September 13 2010</h3>
+</div>
+<div class="post">
+  
+  <p>Originally written on 23/10/2009, i’m posting it again since some external links were pointing to it.</p>
+
+<p>So you just got a brand new laptop with an insane chunk of ram, like 4GB or so and you are afraid it won’t be ever used at all… You can take advantage of it to have your debian linux box run insanely fast. This process can be easily ported to distributions other than mine but this won’t be covered. Let’s begin.
+Our aim is to load your whole root partition into ram, so every binary, shared library, tmp file and so will be instantly accessed. My advice is to keep <code class="highlighter-rouge">/</code> and <code class="highlighter-rouge">/home</code> on different partitions, so you can still save your files and configs with little access to the disk.</p>
+
+<p>Boot into your system and clean up as much as you can, because every useless MB you leave on <code class="highlighter-rouge">/</code> means less memory available later.
+    apt-get clean
+    rm -R /usr/src/*
+    …</p>
+
+<p>Here comes the magic: backup the script “/usr/share/initramfs-tools/scripts/local” and hack it to mount root as tmpfs, here’s my patch file:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="gd">--- local_orig  2009-03-13 08:46:21.000000000 +0100
+</span><span class="gi">+++ local_rikiji        2009-03-13 08:58:10.000000000 +0100
+</span><span class="gu">@@ -117,8 +117,17 @@
+</span> 
+        # FIXME This has no error checking
+        # Mount root
+<span class="gd">-       mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
+-
+</span><span class="gi">+       # mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
++       TMPRAMROOT="/ramroot"
++       mkdir $TMPRAMROOT
++       mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} $TMPRAMROOT
++       mount -t tmpfs none ${rootmnt}
++       cd ${rootmnt}
++       echo "Unpacking root into ram..."
++       tar -xf "$TMPRAMROOT/packedroot.tar"
++       echo "Done."
++       umount $TMPRAMROOT
++      
+</span>        [ "$quiet" != "y" ] &amp;&amp; log_begin_msg "Running /scripts/local-bottom"
+        run_scripts /scripts/local-bottom
+        [ "$quiet" != "y" ] &amp;&amp; log_end_msg
+</code></pre>
+</div>
+
+<p>Then it should appear like this:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code># Comment out the usual roofs mount
+# mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
+TMPRAMROOT="/ramroot"
+mkdir $TMPRAMROOT
+mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} $TMPRAMROOT
+mount -t tmpfs none ${rootmnt}
+cd ${rootmnt}
+echo "Unpacking root into ram..."
+tar -xf "$TMPRAMROOT/packedroot.tar"
+echo "Done."
+umount $TMPRAMROOT
+</code></pre>
+</div>
+
+<p>Let’s build the <code class="highlighter-rouge">initrd</code> image: </p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>mkinitramfs -o /boot/initrd.img-`uname -r`-ramroot
+</code></pre>
+</div>
+
+<p>and add an adequate bootloader entry, this is mine for grub</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>title RamRoot fscking fast Debian GNU/Linux, kernel 2.6.26-1-686-bigmem
+root (hd0,1)
+kernel /boot/vmlinuz-2.6.26-1-686-bigmem root=/dev/sda2 ro quiet
+initrd /boot/initrd.img-2.6.26-1-686-bigmem-ramroot
+</code></pre>
+</div>
+
+<p>Now fire up you favourite live CD and pack your root. I avoided gzipping it to speedup unpacking process (that happens every boot). Something like:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>tar -cf /mnt/sda3/packedroot.tar /mnt/sda2/*
+mv /mnt/sda3/packedroot.tar /mnt/sda2/
+</code></pre>
+</div>
+
+<p>And you’re done! Reboot and enjoy your amazingly fast system!</p>
+
+  
+  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2010/09/13/Mount-root-as-tmpfs.html" addthis:title="Mount root as tmpfs" addthis:description="Originally written on 23/10/2009, i’m posting it again since some external links were pointing to it. So you just got...">
+    <a class="addthis_button_reddit"></a>    
+    <a class="addthis_button_facebook"></a>
+    <a class="addthis_button_twitter"></a>
+    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
+    <a class="addthis_counter addthis_bubble_style"></a>
+  </div>
+
+</div>
+<hr>
+
+	<div class="bottom">	  
+	  <div>
+	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
+	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
+	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
+	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+	  </div>
+	  <p class="eof">EOF</p>
+	</div>
+
+
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
+	  <h1><a href="http://rikiji.it">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>
