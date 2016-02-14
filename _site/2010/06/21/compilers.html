@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,52 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2010/06/21/compilers.html">compilers!</a></h2>
-  <h3>June 21 2010</h3>
-</div>
-<div class="post">
-  
-  <p>Actually it&#8217;s not really about &#8220;ebooks&#8221;&#8230; but it makes sense, since this is the first time since months i&#8217;m buying a paper book instead of a digital one! (so i can bring it to the beach)</p>
-
-<p><a href='http://rikiji.it/data/20100621174.jpg'><img alt='dragon book' src='http://rikiji.it/data/tb-20100621174.jpg' /></a></p>
-
-<p>It&#8217;s the <a href='http://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools'>dragon book</a>, an ancient 1986 edition! Awesome. Today amazon sent me also &#8220;modern compiler implementation&#8221; (appel), let&#8217;s see which one is more interesting.</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2010/06/21/compilers.html" addthis:title="compilers!" addthis:description="Actually it's not really about "ebooks"... but it makes sense, since this is the first time since months i'm buying...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

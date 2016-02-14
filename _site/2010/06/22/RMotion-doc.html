@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,91 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2010/06/22/RMotion-doc.html">RMotion doc</a></h2>
-  <h3>June 22 2010</h3>
-</div>
-<div class="post">
-  
-  <p>RMotion provides a simple interface to build motion detection software in ruby. At the moment it&#8217;s still under test, i need to try it with different webcams before releasing it. If you have a webcam that works on linux and would like to try it now just drop me an email!</p>
-
-<p><a href='http://www.rikiji.it/post/14'>Last time</a> i showed up with a demo of car motion detection with some noise and green cells to mark movements. Now RMotion is much more configurable, both noise selection and output marking are customizable. This is how RMotion runs with default options:</p>
-<div class='youtube'><center><iframe frameborder='0' height='300' src='http://www.youtube.com/embed/HNL-2pNkuSo' width='80%'>        </iframe></center></div>
-<p>Now let&#8217;s see in <strong>irb</strong> some configuration options. Require the lib, instantiate the main object and print default options:</p>
-
-<pre><code>irb(main):001:0&gt; require &#39;rmotion&#39;
-=&gt; true
-irb(main):002:0&gt; m=Motion.new
-=&gt; #&lt;Motion:0xb74d14a0&gt;
-irb(main):003:0&gt; m.show?
-=&gt; true
-irb(main):004:0&gt; m.write?
-=&gt; false
-irb(main):005:0&gt; m.fft?
-=&gt; true</code></pre>
-
-<p><code>show</code>, <code>write</code> and <code>fft</code> are the most important options. When <code>show</code> is true the video analyzed is also displayed in a window. You can set <code>write</code> to a string (a filename) to save the video analyzed to a file! Both displayed and saved video will have motion detection markings on it, like the video i just showed to you.</p>
-
-<p><code>fft</code> manages how the video frames are processed (fast fourier transform or direct): i recommend to set it always true, except in case your cpu isn&#8217;t fast enough to follow the stream in realtime. Soon i&#8217;ll post an in-depth analysis of what&#8217;s the difference between <code>fft=true</code> and <code>fft=false</code>.</p>
-
-<pre><code>irb(main):006:0&gt; m.fill?
-=&gt; true
-irb(main):007:0&gt; m.rect?
-=&gt; false
-irb(main):008:0&gt; m.point?
-=&gt; false</code></pre>
-
-<p>Next group of options is about output frames: <code>fill</code> default true behaves like the previous video, <code>rect</code> draws rectangles around moving objects and <code>point</code> draws instead a small circle centered on the object. Let&#8217;s see them! Note that i can swap them live!</p>
-<div class='youtube'><center><iframe frameborder='0' height='300' src='http://www.youtube.com/embed/0LQIt0XiWqE' width='80%'>        </iframe></center></div>
-<pre><code>irb(main):012:0&gt; m.threshold_fft?
-=&gt; 1.0
-irb(main):013:0&gt; m.threshold_direct?
-=&gt; 8.0
-irb(main):014:0&gt; m.threshold_distance?
-=&gt; 9.0
-irb(main):015:0&gt; m.threshold_group?
-=&gt; 20</code></pre>
-
-<p><code>threshold_fft</code> and <code>threshold_direct</code> values influence what is recognized as noise and what as an object. Note that they are used in a mutually exclusive way: if <code>fft</code> is true then <code>threshold_direct</code> won&#8217;t affect result. Same for <code>fft</code> as false and <code>threshold_fft</code>. Play with those value to fit your enviroment (light, object speed..).</p>
-
-<p><code>threshold_distance</code> and <code>threshold_group</code> also have a role on recognizing objects: an object is a group of al least <strong>group</strong> cells distant each other no more than <strong>distance</strong>. So you can choose min size of objects and spread of cells. Cells are a group of pixel determined dynamically on camera resolution, so don&#8217;t worry about it.</p>
-
-<p>Next time i&#8217;ll talk about capture loop and Entities.</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2010/06/22/RMotion-doc.html" addthis:title="RMotion doc" addthis:description="RMotion provides a simple interface to build motion detection software in ruby. At the moment it's still under test, i...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

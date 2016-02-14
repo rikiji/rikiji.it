@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,93 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2010/05/02/OpenCV-gem-patch.html">OpenCV gem patch</a></h2>
-  <h3>May 02 2010</h3>
-</div>
-<div class="post">
-  
-  <p>I had to fix some lines of the gem source code in order to build it correctly on my debian machine.</p>
-
-<pre><code>iplimage.cpp: In function ‘VALUE mOpenCV::cIplImage::rb_initialize(int, VALUE*, VALUE)’:
-iplimage.cpp:91: error: ‘cvCvToIplDepth’ was not declared in this scope
-iplimage.cpp: In function ‘VALUE mOpenCV::cIplImage::new_object(int, int, int)’:
-iplimage.cpp:228: error: ‘cvCvToIplDepth’ was not declared in this scope
-iplimage.cpp: In function ‘VALUE mOpenCV::cIplImage::new_object(CvSize, int)’:
-iplimage.cpp:234: error: ‘cvCvToIplDepth’ was not declared in this scope
-make: *** [iplimage.o] Error 1</code></pre>
-
-<p>Here&#8217;s the fix</p>
-
-<pre><code>--- iplimage.cpp	1970-01-01 01:00:00.000000000 +0100 
-+++ _iplimage.cpp	2010-04-16 09:59:23.000000000 +0200 
-@@ -88,7 +88,7 @@ 
-rb_scan_args(argc, argv, &quot;22&quot;, &amp;width, &amp;height, &amp;depth, &amp;channel); 
-int _depth = argc &lt; 3 ? CV_8U : FIX2INT(depth); 
-int _channel = argc &lt; 4 ? 3 : FIX2INT(channel); 
-- DATA_PTR(self) = cvCreateImage(cvSize(FIX2INT(width), FIX2INT(height)), cvCvToIplDepth(_depth), _channel); 
-+ DATA_PTR(self) = cvCreateImage(cvSize(FIX2INT(width), FIX2INT(height)), cvIplDepth(_depth), _channel); 
-return self; 
-} 
-
-@@ -225,13 +225,13 @@ 
-VALUE 
-new_object(int width, int height, int type) 
-{ 
-- return OPENCV_OBJECT(rb_klass, cvCreateImage(cvSize(width, height), cvCvToIplDepth(type), CV_MAT_CN(type))); 
-+ return OPENCV_OBJECT(rb_klass, cvCreateImage(cvSize(width, height), cvIplDepth(type), CV_MAT_CN(type))); 
-} 
-
-VALUE 
-new_object(CvSize size, int type) 
-{ 
-- return OPENCV_OBJECT(rb_klass, cvCreateImage(size, cvCvToIplDepth(type), CV_MAT_CN(type))); 
-+ return OPENCV_OBJECT(rb_klass, cvCreateImage(size, cvIplDepth(type), CV_MAT_CN(type))); 
-} 
-
-__NAMESPACE_END_IPLIMAGE </code></pre>
-
-<p>then just run as usual</p>
-
-<pre><code>ruby extconf.rb 
-make</code></pre>
-
-<p>and place opencv.so in your ruby lib path. You will need libffcall1-dev to build the GUI module, otherwise opencv will build cleanly but without gui support.</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2010/05/02/OpenCV-gem-patch.html" addthis:title="OpenCV gem patch" addthis:description="I had to fix some lines of the gem source code in order to build it correctly on my debian...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

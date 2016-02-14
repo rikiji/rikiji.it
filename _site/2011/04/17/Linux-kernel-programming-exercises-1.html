@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,130 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2011/04/17/Linux-kernel-programming-exercises-1.html">Linux kernel programming exercises 1</a></h2>
-  <h3>April 17 2011</h3>
-</div>
-<div class="post">
-  
-  <p>This is the first post of a series (i hope) about linux kernel development. Despite there are <a href='http://www.amazon.com/Linux-Kernel-Development-Robert-Love/dp/0672329468' title='Linux Kernel Development'>excellent</a> <a href='http://lwn.net/Kernel/LDD3/' title='Linux Device Drivers'>books</a> that describe throughly both kernel and modules, there aren&#8217;t many sources that provide programming exercises in the form <strong>task-hint-solution</strong>.</p>
-
-<p>Purpose of this series of posts is to compensate for that lack. Source of exercises will be available on <a href='https://github.com/rikiji'>github</a> and commented here. Please note that modules/patches described here won&#8217;t always be useful as they are just intended to increase linux kernel hacking experience.</p>
-
-<h2 id='task'>Task</h2>
-
-<p>The first proposed task is to develop a <strong>kernel module</strong> aimed to check the <strong>ARP table</strong> to detect when something fishy is going on. Requisites:</p>
-
-<ul>
-<li>Solution has to be a <strong>kernel module</strong>, as it can be done without harming the kernel tree. ARP checking can be easily done in user space reading /proc/net/arp but that won&#8217;t help in undestanding how the linux kernel works.</li>
-
-<li>run checks at regular <strong>intervals of time</strong> without any busy waiting.</li>
-
-<li>Checks should detect <strong>duplicated entries</strong> in the ARP table. That&#8217;s an acceptable approssimation to detect arp spoofing.</li>
-</ul>
-
-<h2 id='hints'>Hints</h2>
-
-<p>Some way to efficiently parse the kernel source tree is mandatory, oneliner below does the trick:</p>
-
-<pre><code>find . -regex &quot;.*\\.\([ch]\)&quot; -exec grep -Hn $1 {} \;[/sh]
-Symbols accessible from modules are explicitly exported by following macros:
-
- * `EXPORT_SYMBOL(..)`
- * `EXPORT_SYMBOL_GPL(..)`
-
-so running the previous line of code within `linux-2.6.38.2/net/ipv4` results in a lot of matches, which grepped again for __arp__ lead to a reasonable amount of lines.
-[sh=plain]
-./arp.c:119:EXPORT_SYMBOL(clip_tbl_hook);
-./arp.c:202:EXPORT_SYMBOL(arp_tbl);
-./arp.c:515:EXPORT_SYMBOL(arp_find);
-./arp.c:718:EXPORT_SYMBOL(arp_create);
-./arp.c:728:EXPORT_SYMBOL(arp_xmit);
-./arp.c:754:EXPORT_SYMBOL(arp_send);
-./arp.c:1160:EXPORT_SYMBOL(arp_invalidate);
-./netfilter/arp_tables.c:61:EXPORT_SYMBOL_GPL(arpt_alloc_initial_table);
-./netfilter/arp_tables.c:1900:EXPORT_SYMBOL(arpt_register_table);
-./netfilter/arp_tables.c:1901:EXPORT_SYMBOL(arpt_unregister_table);
-./netfilter/arp_tables.c:1902:EXPORT_SYMBOL(arpt_do_table);</code></pre>
-
-<p><code>arp_tb</code> looks like a good place to start from.</p>
-
-<h2 id='solution'>Solution</h2>
-
-<p><code>arp_tbl</code> is an instance of a more general table <code>struct neigh_table</code>, which is used to keep track of associations between network and data link layers. Likely there&#8217;s a set of functions ready to parse it laying somewhere in the kernel tree. <code>net/core/neighbour.c</code> can be found with the same combination of find and grep cited above. The function needed is <code>neigh_for_each</code>, which is also conveniently exported to modules. Function usage can be learnt by <code>./decnet/dn_neigh.c:535:</code>. Note that <code>nr_neigh_for_each</code> is not the same.</p>
-
-<p><code>neigh_for_each</code> requires a callback function that will be called once for every entry in the table. Optional argument is not required in this case.</p>
-
-<pre><code>void neigh_handler(struct neighbour * n, void * null)
-{
-  struct neigh_list_t *tmp;
-  int found = 0;
-  char hbuffer[HBUFFERLEN];
-
-  /* search */
-  list_for_each_entry(tmp, &amp;neigh_list.list, list) {
-    if(memcmp(n-&gt;ha,tmp-&gt;ha,n-&gt;dev-&gt;addr_len)==0) {
-      format_hwaddr(n-&gt;ha, n-&gt;dev-&gt;addr_len, hbuffer);
-      printk(KERN_ALERT &quot;duplicated entry: %s\n&quot;, hbuffer);
-      found = 1;
-    }
-  }
-  
-  /* add an entry */
-  if(!found) {
-    struct neigh_list_t * new_entry = (struct neigh_list_t *) kmalloc(sizeof(struct neigh_list_t), GFP_KERNEL);
-    memcpy(new_entry-&gt;ha,n-&gt;ha,n-&gt;dev-&gt;addr_len);
-    memcpy(new_entry-&gt;primary_key,n-&gt;primary_key,sizeof(u8 *));
-    list_add(&amp;(new_entry-&gt;list), &amp;(neigh_list.list));
-  }  
-}</code></pre>
-
-<p>Standard kernel data structures have been used to keep track of previous entries. A list is filled with IP and MAC addresses and then compared to each new neighbour entry. When a MAC address is not found in the current list it will be added at the end of the loop. When a MAC has already be seen instead, <code>&quot;duplicated entry: XX:XX:XX:XX:XX:XX&quot;</code> is printed and visible through <strong>dmesg</strong>.</p>
-
-<p>To run this check every N seconds kernel <strong>workqueues</strong> have been chosen.</p>
-
-<pre><code>static struct workqueue_struct * workq;
-static DECLARE_DELAYED_WORK(work, arp_tbl_check);
-...
-workq = create_singlethread_workqueue(&quot;arp_tbl_check_wq&quot;);
-queue_delayed_work(workq, &amp;work, HZ * 5);</code></pre>
-
-<p>For this case a simple single-thread single-work queue would suffice.<code>HZ * 5</code> sets the next run at approximately 5 seconds of jiffies away. Grab <a href='https://github.com/rikiji/arpcheck'>full code</a>.</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2011/04/17/Linux-kernel-programming-exercises-1.html" addthis:title="Linux kernel programming exercises 1" addthis:description="This is the first post of a series (i hope) about linux kernel development. Despite there are [excellent][1] [books][2] that...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

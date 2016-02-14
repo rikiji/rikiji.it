@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,77 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2012/06/26/RMotion-with-additional-neural-networks.html">RMotion with additional neural networks</a></h2>
-  <h3>June 26 2012</h3>
-</div>
-<div class="post">
-  
-  <p>Last year I developed RMotion, a library with <strong>ruby</strong> bindings that can be used to detect moving objects in a video/cam stream in real time. It is quite convenient to solve simple detections problems because you can just program the logic in <strong>ruby</strong> inside the main loop and you get most of the detection issues solved for free by the library.</p>
-
-<p>I subsequentely added classifying features: as you can see in the <a href='http://www.youtube.com/watch?v=1wxg4nUQ_DA&amp;feature=g-upl'>previous video</a> or in this one below, it is now possible to train a classifier with a desired shape and then receive in <strong>ruby</strong> the type of the moving entity, according to an accuracy threshold specified.</p>
-
-<p>The improvement from my last post is the classification of multiple classes of objects instead of a single one, and the removal of the edge effect that occurred when the object was not fully in view. The video is slowed down at approx. 30% to make the labels visible for humans!</p>
-<div class='youtube'><center><iframe frameborder='0' height='300' src='http://www.youtube.com/embed/IsNLzhu_BKM' width='80%'>        </iframe></center></div>
-<p>Unfortunately the manual work for the user increases linearly with the number of classes to detect. Currently i&#8217;m using multiple neural networks ( <strong>supervised learning</strong> ) as a classifier, and human intervention is necessary to decide which shapes belong to a class and which are noise before training the net. After that the shapes are generated, the user places them in appropriately labeled directories and then a training script does everything automatically:</p>
-
-<pre><code>rkj@harpoon:~/code/rmotion/v3$ ruby net/car.net sets/car/
-Training
-count: 00000, terror: 1.26979
-count: 00010, terror: 0.02167
-count: 00020, terror: 0.00835
-...
-count: 02530, terror: 0.00004
-count: 02540, terror: 0.00004
-Testing
-EXPECTED: true
-0.941322135603077 true
-EXPECTED: false
-0.02227733085452 false
-rkj@harpoon:~/code/rmotion/v3$ ruby net/bike.net sets/bike/
-Training
-count: 00000, terror: 1.46554
-count: 00010, terror: 0.01378
-...</code></pre>
-
-<p>The idea to mitigate this effort is to use <strong>unsupervised learning</strong> to classify the different classes, so that if the classifier learns how a high number of objects are shaped it will be eventually able to partition them in groups, and the job of the user will be just to decide within how many groups the objects are going to be split. I didn&#8217;t decide yet the nature of the unsupervised classifier, I&#8217;ll run some tests as soon as i can get some good quality traffic footage.</p>
-
-<p>The second thing that i&#8217;d like to add is a stronger object tracking algorithm, so that if the object stops or its path overlaps with another one it would be possible to track it anyway. I can implement this using some kind of <strong>feature detection</strong> other than movement or i can record the position and the full path on screen of the object and trace back the origin of disappearing/reappearing objects. The first approach sound more appealing to me, so the next step will be in that direction.</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2012/06/26/RMotion-with-additional-neural-networks.html" addthis:title="RMotion with additional neural networks" addthis:description="Last year I developed RMotion, a library with __ruby__ bindings that can be used to detect moving objects in a...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

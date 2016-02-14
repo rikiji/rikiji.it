@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,109 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2010/09/13/Mount-root-as-tmpfs.html">Mount root as tmpfs</a></h2>
-  <h3>September 13 2010</h3>
-</div>
-<div class="post">
-  
-  <p>Originally written on 23/10/2009, i&#8217;m posting it again since some external links were pointing to it.</p>
-
-<p>So you just got a brand new laptop with an insane chunk of ram, like 4GB or so and you are afraid it won&#8217;t be ever used at all&#8230; You can take advantage of it to have your debian linux box run insanely fast. This process can be easily ported to distributions other than mine but this won&#8217;t be covered. Let&#8217;s begin. Our aim is to load your whole root partition into ram, so every binary, shared library, tmp file and so will be instantly accessed. My advice is to keep <code>/</code> and <code>/home</code> on different partitions, so you can still save your files and configs with little access to the disk.</p>
-
-<p>Boot into your system and clean up as much as you can, because every useless MB you leave on <code>/</code> means less memory available later. apt-get clean rm -R /usr/src/* &#8230;</p>
-
-<p>Here comes the magic: backup the script &#8220;/usr/share/initramfs-tools/scripts/local&#8221; and hack it to mount root as tmpfs, here&#8217;s my patch file:</p>
-
-<pre><code>--- local_orig  2009-03-13 08:46:21.000000000 +0100
-+++ local_rikiji        2009-03-13 08:58:10.000000000 +0100
-@@ -117,8 +117,17 @@
- 
-        # FIXME This has no error checking
-        # Mount root
--       mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
--
-+       # mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
-+       TMPRAMROOT=&quot;/ramroot&quot;
-+       mkdir $TMPRAMROOT
-+       mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} $TMPRAMROOT
-+       mount -t tmpfs none ${rootmnt}
-+       cd ${rootmnt}
-+       echo &quot;Unpacking root into ram...&quot;
-+       tar -xf &quot;$TMPRAMROOT/packedroot.tar&quot;
-+       echo &quot;Done.&quot;
-+       umount $TMPRAMROOT
-+      
-        [ &quot;$quiet&quot; != &quot;y&quot; ] &amp;&amp; log_begin_msg &quot;Running /scripts/local-bottom&quot;
-        run_scripts /scripts/local-bottom
-        [ &quot;$quiet&quot; != &quot;y&quot; ] &amp;&amp; log_end_msg</code></pre>
-
-<p>Then it should appear like this:</p>
-
-<pre><code># Comment out the usual roofs mount
-# mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} ${rootmnt}
-TMPRAMROOT=&quot;/ramroot&quot;
-mkdir $TMPRAMROOT
-mount ${roflag} -t ${FSTYPE} ${ROOTFLAGS} ${ROOT} $TMPRAMROOT
-mount -t tmpfs none ${rootmnt}
-cd ${rootmnt}
-echo &quot;Unpacking root into ram...&quot;
-tar -xf &quot;$TMPRAMROOT/packedroot.tar&quot;
-echo &quot;Done.&quot;
-umount $TMPRAMROOT</code></pre>
-
-<p>Let&#8217;s build the <code>initrd</code> image:</p>
-
-<pre><code>mkinitramfs -o /boot/initrd.img-`uname -r`-ramroot</code></pre>
-
-<p>and add an adequate bootloader entry, this is mine for grub</p>
-
-<pre><code>title RamRoot fscking fast Debian GNU/Linux, kernel 2.6.26-1-686-bigmem
-root (hd0,1)
-kernel /boot/vmlinuz-2.6.26-1-686-bigmem root=/dev/sda2 ro quiet
-initrd /boot/initrd.img-2.6.26-1-686-bigmem-ramroot</code></pre>
-
-<p>Now fire up you favourite live CD and pack your root. I avoided gzipping it to speedup unpacking process (that happens every boot). Something like:</p>
-
-<pre><code>tar -cf /mnt/sda3/packedroot.tar /mnt/sda2/*
-mv /mnt/sda3/packedroot.tar /mnt/sda2/</code></pre>
-
-<p>And you&#8217;re done! Reboot and enjoy your amazingly fast system!</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2010/09/13/Mount-root-as-tmpfs.html" addthis:title="Mount root as tmpfs" addthis:description="Originally written on 23/10/2009, i'm posting it again since some external links were pointing to it. So you just got...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

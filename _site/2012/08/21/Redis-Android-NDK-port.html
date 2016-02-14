@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,56 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2012/08/21/Redis-Android-NDK-port.html">Redis Android NDK port</a></h2>
-  <h3>August 21 2012</h3>
-</div>
-<div class="post">
-  
-  <p>I just finished the first step of porting <a href='http://redis.io'>Redis</a>, the server component, to the Android ndk. I didn&#8217;t test anything besides basic features, value store/load, db save and db restore but the few things i tested worked perfectly. To port it i created a stub app and compiled the source tree as a <strong>JNI</strong> library. I brought in <strong>lua</strong> too since it is a dependency needed by Redis for server-side scripting.</p>
-
-<p>I added in the source code <code>#ifdef __ANDROID__</code> macros where I introduced some fixes to compile successfully, mostly related to compatibility with the bionic c library on Android. The entry point in <code>redis.c</code> has been substituted by a <strong>JNI</strong> call and the log function hooked to <strong>Logcat</strong> for convenient debugging. The db is stored on the sdcard in <code>/sdcard/redis/</code>.</p>
-
-<p>The stub app has a button to start/stop Redis as an Android service and another one to test if it answers correctly to set/get calls. It is up <a href='https://github.com/rikiji/redis-android'>here on github</a>. I use <a href='https://github.com/xetorthio/jedis'>Jedis</a> as a client library, the next step will be importing the Jedis test suite to fix what doesn&#8217;t behave in the right way and add an option to read the server configuration file from the sdcard.</p>
-
-<blockquote>
-<p><a href='https://github.com/rikiji/redis-android'>Fork it on github</a></p>
-</blockquote>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2012/08/21/Redis-Android-NDK-port.html" addthis:title="Redis Android NDK port" addthis:description="I just finished the first step of porting [Redis](http://redis.io), the server component, to the Android ndk. I didn't test anything...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

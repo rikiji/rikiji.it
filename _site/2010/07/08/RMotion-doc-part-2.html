@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,91 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2010/07/08/RMotion-doc-part-2.html">RMotion doc part 2</a></h2>
-  <h3>July 08 2010</h3>
-</div>
-<div class="post">
-  
-  <p>Second part of RMotion documentation. Motion objects methods <code>vid</code> and <code>cam</code> yield information about moving objects to the passed block. m=Motion.new m.cam do |e| &#8230; end</p>
-
-<p>Those informations are organized as an array of <code>Entity</code> instances. So far up to 8 different objects can be recognized. Entities array entries are ordered by size, so the bigger-faster moving one will be first. Entities methods are <code>center</code> and <code>corners</code></p>
-
-<pre><code>m=Motion.new
-m.cam do |e| 
-  p e.first.center
-  p e.first.corners
-end </code></pre>
-
-<p>and that&#8217;s the output produced, in the form</p>
-
-<pre><code>[:x,:y]
-[:topleftx,:toplefty,:bottomrightx,:bottomrighty]
-
-nil
-[nil, nil, nil, nil]
-[416, 68]
-[320, 0, 512, 136]
-[356, 36]
-[320, 0, 392, 72]
-...</code></pre>
-
-<p>To track current entities could be useful to keep each entity at the same array index even when others disappear, so that&#8217;s the meaning of class method <code>reorder</code>. <code>Entity.status</code> returns an initialized empty array, so it can be used to store last frame entity information. <code>Entity.reorder</code> takes the reference array and the new generated one and places everything where it should be.</p>
-
-<pre><code>m=Motion.new
-status=Entity.status
-m.cam do |e| 
-  Entity.reorder status, e
-  status.each_with_index do |s,n|
-    puts &quot;Entity #{n} is in position #{s.center.inspect}&quot; unless s.center.nil?
-  end
-end </code></pre>
-
-<p><code>vid</code> can read a video file and acts like cam. To quite the loop you can execute <code>m.quit</code> or hit b on you keyboard, unless you previously set <code>m.show=false</code>.</p>
-
-<pre><code>m=Motion.new
-i=0
-m.vid(&quot;capture.avi&quot;) do |e|
-  m.quit if i &gt; 100
-  i+=1
-end </code></pre>
-
-<p>I&#8217;m posting the gem to github and rubygems as soon as possible.</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2010/07/08/RMotion-doc-part-2.html" addthis:title="RMotion doc part 2" addthis:description="Second part of RMotion documentation. Motion objects methods `vid` and `cam` yield information about moving objects to the passed block....">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>

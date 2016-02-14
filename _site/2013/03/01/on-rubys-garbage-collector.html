@@ -21,7 +21,7 @@
       var addthis_config = {"data_track_clickback":false };
       var addthis_share = {templates : {twitter : "{{title}}: {{url}}"}}      
     </script>
-    
+    {{ "{% endraw " }}%}
     <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4f7391fd6bf055cd"></script>
     <link href="http://fonts.googleapis.com/css?family=Didact+Gothic" rel="stylesheet" type="text/css">
     <link href="http://fonts.googleapis.com/css?family=Crimson+Text:400,600" rel="stylesheet" type="text/css">
@@ -35,151 +35,19 @@
 
     <div class="row-fluid">
       <div id="content" class="span9">
-	<div class="top">
-  <h2><a href="http://rikiji.it/2013/03/01/on-rubys-garbage-collector.html">On ruby's garbage collector</a></h2>
-  <h3>March 01 2013</h3>
-</div>
-<div class="post">
-  
-  <p>Ruby 2.0 features a new garbage collection algorithm, called Bitmap Marking. To understand how this new approach works, a brief look at the ruby design is needed, starting with <strong>ruby.h</strong>.</p>
-
-<p>All ruby objects are referenced through variables of the type <code>VALUE</code> in the C code: a <code>VALUE</code> is an unsigned integer that can be an immediate value (integer, float, symbol, true, false , nil) or a pointer to a <code>RBasic</code> structure. A <code>RBasic</code> structure holds two fields, <code>flags</code> and <code>klass</code>. There are many macros that can be used to check the type of an object just by accessing those flags, <code>BUILTIN_TYPE</code> is one of those and it is defined as follows:</p>
-
-<pre><code>#define BUILTIN_TYPE(x) (int)(((struct RBasic*)(x))-&gt;flags &amp; T_MASK)</code></pre>
-
-<p>The type of an object can be one of those in the enum <code>ruby_value_type</code>, some of them are:</p>
-
-<pre><code>enum ruby_value_type {
-RUBY_T_NONE   = 0x00,
-
-RUBY_T_OBJECT = 0x01,
-RUBY_T_CLASS  = 0x02,
-RUBY_T_MODULE = 0x03,
-RUBY_T_FLOAT  = 0x04,
-RUBY_T_STRING = 0x05,
-RUBY_T_REGEXP = 0x06,
-RUBY_T_ARRAY  = 0x07,
-RUBY_T_HASH   = 0x08,
-RUBY_T_STRUCT = 0x09,
-RUBY_T_BIGNUM = 0x0a,
-RUBY_T_FILE   = 0x0b,
-RUBY_T_DATA   = 0x0c,
-RUBY_T_MATCH  = 0x0d,
-RUBY_T_COMPLEX  = 0x0e,
-RUBY_T_RATIONAL = 0x0f,
-...</code></pre>
-
-<p>So how does it work in practice? Let&#8217;s have a look at <code>RString</code>: it is a struct that holds a <code>RBasic</code> struct inside. When you want to check if a <code>VALUE</code> is a string, the first thing that <code>rb_type(VALUE obj)</code> does is to check if it is an immediate value. If not, it will be cast to <code>RBasic</code> and the flags will be accessed by <code>BUILTIN_TYPE</code>. The result can be compared to <code>RUBY_T_STRING</code>: if it matches, it is safe to cast (again) the <code>VALUE</code> to <code>RString</code>. Please note that the <code>RBasic</code> structure is still accessible with the new pointer, as it is included into <code>RString</code>!</p>
-
-<pre><code>struct RString {
-struct RBasic basic;
-union {
-    struct {
-	long len;
-	char *ptr;
-	union {
-	    long capa;
-	    VALUE shared;
-	} aux;
-    } heap;
-    char ary[RSTRING_EMBED_LEN_MAX + 1];
-} as;
-};</code></pre>
-
-<p>RString has actually more features than RBasic, it can contain an array of characters directly (on a 32 bits system the max size is 12 + 1 bytes) or it can contain a reference to a string allocated elsewhere. Casting <code>RBasic</code> structures to other types is valid for all ruby objects, and this feature is exploited by the GC to allocate space easily.</p>
-
-<p>Now that the basic strategies of <code>VALUE</code> handling used by the ruby interpreter are known, we can move on to <strong>gc.c</strong>. <code>RVALUE</code> is a wrapper structure used to hold any of the previously discussed ones. This is the base &#8220;unit&#8221; that will be used to allocate and free memory.</p>
-
-<pre><code> typedef struct RVALUE {
-union {
-    struct {
-	VALUE flags;		/* always 0 for freed obj */
-	struct RVALUE *next;
-    } free;
-    struct RBasic  basic;
-    struct RObject object;
-    struct RClass  klass;
-    struct RFloat  flonum;
-    struct RString string;
-    struct RArray  array;
-    struct RRegexp regexp;
-    struct RHash   hash;
-    struct RData   data;
-    struct RTypedData   typeddata;
-    struct RStruct rstruct;
-    struct RBignum bignum;
-    struct RFile   file;
-    struct RNode   node;
-    struct RMatch  match;
-    struct RRational rational;
-    struct RComplex complex;
-} as;
-} RVALUE;</code></pre>
-
-<p>Ruby tracks allocated memory in structures called <code>heaps_slot</code>. Each of them includes a pointer to a linked list of <code>RVALUE</code> structures. Let&#8217;s follow the flow of the code when a new object is created, I cut out not relevant lines:</p>
-
-<pre><code>static VALUE
-newobj(VALUE klass, VALUE flags)
-{
-rb_objspace_t *objspace = &amp;rb_objspace;
-VALUE obj;
-
-...
-
-obj = (VALUE)objspace-&gt;heap.free_slots-&gt;freelist;
-objspace-&gt;heap.free_slots-&gt;freelist = RANY(obj)-&gt;as.free.next;
-if (objspace-&gt;heap.free_slots-&gt;freelist == NULL) {
-    unlink_free_heap_slot(objspace, objspace-&gt;heap.free_slots);
-}
-
-MEMZERO((void*)obj, RVALUE, 1);
-objspace-&gt;total_allocated_object_num++;
-
-return obj;
-}</code></pre>
-
-<p>A <code>RVALUE</code> object is taken from a global freelist and the head of the list is shifted forwards. This <code>obj</code> is a pointer to a memory area which is big enough to store any ruby structure: <code>RString</code>, <code>RArray</code>&#8230; When this list becomes empty, the GC is called and it will try to free some <code>RVALUE</code>. If not possible, a new <code>heaps_slot</code> (or more) will be allocated.</p>
-
-<p>Now that is known how objects are allocated, we can inspect the two phases of the garbage collector. The phases are named <strong>mark</strong> and <strong>sweep</strong>. In the first phase all the objects still reachable are marked. In the sweep phase all the objects not marked are identified and added to the freelist we mentioned before. Additionally, while traversing the lists all marks are reset to prepare the objects for the next GC round.</p>
-
-<p>Starting from the function <code>garbage_collect</code>, we can dig into the mark phase, handled by the function <code>gc_marks</code>. The real job is done by the function <code>gc_mark_stacked_objects</code>, which consists in a giant switch-case statement that handles all the <code>RVALUE</code> subtypes differently. In the sweep phase, which starts in <code>gc_sweep</code>, all the <code>RVALUE</code> objects without a mark are added to the freelist that is used to allocate new objects.</p>
-
-<p>In the next post I&#8217;ll focus on the improvements introduced by the garbage collector of Ruby 2.0 and maybe provide some benchmark result.</p>
-  
-  <div class="addthis_toolbox addthis_default_style" addthis:url="http://rikiji.it/2013/03/01/on-rubys-garbage-collector.html" addthis:title="On ruby's garbage collector" addthis:description="Ruby 2.0 features a new garbage collection algorithm, called Bitmap Marking. To understand how this new approach works, a brief...">
-    <a class="addthis_button_reddit"></a>    
-    <a class="addthis_button_facebook"></a>
-    <a class="addthis_button_twitter"></a>
-    <a class="addthis_button_google_plusone" g:plusone:count="false"></a>
-    <a class="addthis_counter addthis_bubble_style"></a>
-  </div>
-
-</div>
-<hr>
-
-	<div class="bottom">	  
-	  <div>
-	    <img class="pic" src="http://rikiji.it/images/me4.jpg">
-	    <p class="desc">I am Riccardo, I studied computer engineering at the University of Trieste (Italy) and then got a M.Sc. in the same field at the University of Stuttgart (Germany). I now live in Zurich, Switzerland.</p>
-	    <p>You should follow me on twitter: <a href="https://twitter.com/rikiji" class="twitter-follow-button" data-show-count="false">Follow @rikiji</a></p>
-	    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
-	  </div>
-	  <p class="eof">EOF</p>
-	</div>
-
-
+	{{ content }}
       </div>
       <div id="sidebar" class="span3">
 	<div class="sidebar-nav sidebar-nav-fixed">
-	  <h1><a href="http://rikiji.it">rikiji</a></h1>
+	  <h1><a href="http://{{ site.domain }}">rikiji</a></h1>
 	  <hr>
 	  <ul class="unstyled">
-	    <li><a href="http://rikiji.it/posts.html">posts</a> <i class="icon-comment"></i> </li>
+	    <li><a href="http://{{ site.domain }}/posts.html">posts</a> <i class="icon-comment"></i> </li>
 	    <li><a target="_blank" href="https://twitter.com/rikiji">twitter</a> <i class="icon-twitter"></i></li>
 	    <li><a target="_blank" href="https://github.com/rikiji">github</a> <i class="icon-github-alt"></i></li>
 	    <li><a target="_blank" href="https://plus.google.com/108443252369367751910?rel=author">google+</a> <i class="icon-google-plus"></i></li>
 	    <li><a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> <i class="icon-envelope-alt"></i></li>
-	    <li><a href="http://rikiji.it/about.html">about</a> <i class="icon-user"></i></li>
+	    <li><a href="http://{{ site.domain }}/about.html">about</a> <i class="icon-user"></i></li>
 	  </ul>
 	</div>
       </div>
