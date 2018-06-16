@@ -1,20 +1,3 @@
-I wrote this blag software to store some posts and comments about the computer-related side of my life. I'm really into operating systems, virtualization/instrumentation and the ruby programming language.
-
-I'm also a high jumper, check some of [my videos](http://www.youjump.eu/search?q=cecolin)! [Video](http://www.youjump.eu/video/0e59545dfa1d41929c71d76895cd9b4e) of my personal best, 2m25 in 2009.
-
-Some websites I developed from scratch and currently maintain, web development is a relaxing hobby:
-
-* <http://www.youjump.eu> Athletics video sharing
-* <http://teacher.playkanji.com> Japanese sentences learning tool
-* <http://mmr.rikiji.it> Memory trace visualization
-* <http://zmbs.net> Home of a reddit bot (now dead...)
-* <http://rikiji.it> This blog! The software went through many many iterations just for fun, one day I'll sum them up.
-
-and some custom platforms:
-
-* <http://rkj.in> Private instagram-clone for android devices
-* <http://board.rikiji.it> Online collaboration tool
-
 .
 
     -----BEGIN PGP PUBLIC KEY BLOCK-----
