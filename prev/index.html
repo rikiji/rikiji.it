@@ -1,0 +1,19 @@
+---
+layout: default
+title: rikiji - blog
+---
+
+{% for post in site.posts limit:6  %}
+<div class="top">
+  <h2><a href="http://{{ site.domain }}{{ post.url }}">{{ post.title }}</a></h2>
+  <h3>{{ post.date | date: "%B %d %Y" }}</h3>
+</div>
+
+<div class="post">
+  <p>{{ post.content | strip_html | truncatewords: 55 }}</p>
+  <p><a class="more" href="http://{{ site.domain }}{{ post.url }}">Read more</a></p>
+</div>
+
+<hr>
+
+{% endfor %}

@@ -1,0 +1,25 @@
+---
+layout: default
+title: rikiji - about
+---
+
+<div class="top">
+  <h2>about</h2>
+</div>
+
+<div class="post about">
+  <img class="pic" src="http://{{ site.domain }}/images/me4.jpg">
+  <p>{% include intro.markdown %}</p>
+
+  <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+
+  {% capture about_content %}
+  {% include about.markdown %}
+  {% endcapture %}
+  {{ about_content | markdownify }}
+
+</div>
+
+<div class="bottom">
+  <p class="eof">EOF</p>	  
+</div>

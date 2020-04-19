@@ -1,19 +1,32 @@
----
-layout: default
-title: rikiji - blog
----
+<html>
+  <head>
+    <title>rikiji.it</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <style>
+      body {text-align: center;}
+      img.pic{border-radius:10%;margin:9px;}
+    </style>
+  </head>
+  <body>
 
-{% for post in site.posts limit:6  %}
-<div class="top">
-  <h2><a href="http://{{ site.domain }}{{ post.url }}">{{ post.title }}</a></h2>
-  <h3>{{ post.date | date: "%B %d %Y" }}</h3>
-</div>
+    <div><img class="pic" src="me4.jpg"></div>
+    
+    <p>
+      <a href="https://twitter.com/rikiji" target="_blank">@rikiji</a> &bull;
+      <a class="mail" href="mailto:rikiji foo rikiji dot it">mail</a> &bull;
+      <a href="https://www.linkedin.com/in/riccardocecolin/" target="_blank">linkedin</a>
+    </p>
 
-<div class="post">
-  <p>{{ post.content | strip_html | truncatewords: 55 }}</p>
-  <p><a class="more" href="http://{{ site.domain }}{{ post.url }}">Read more</a></p>
-</div>
-
-<hr>
-
-{% endfor %}
+    <script>
+      var _gaq=[['_setAccount','UA-30381469-1'],['_trackPageview']];
+      (function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+      g.src=('https:'==location.protocol?'//ssl':'//www')+'.google-analytics.com/ga.js';
+      s.parentNode.insertBefore(g,s)}(document,'script'));
+      
+      $(document).ready(function(){
+        var dom = 'rikiji';
+        $("a.mail").attr("href","mailto:"+dom+"@"+dom+".it");
+      });
+    </script>
+  </body>
+</html>
