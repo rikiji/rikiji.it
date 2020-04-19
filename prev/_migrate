@@ -1,1 +1,0 @@
-Post.find(:all).each { |p| File.open("/tmp/posts/#{p.date.strftime "%Y-%m-%d"}-#{p.title.gsub(/ /,"-")}.markdown","w") { |f| f.puts "---"; f.puts "layout: post"; f.puts "title: #{p.title}"; f.puts "---"; f.puts p.content }}; 0
